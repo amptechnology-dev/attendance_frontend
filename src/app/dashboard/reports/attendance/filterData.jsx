@@ -24,6 +24,18 @@ export default function Component({ staffs = [] }) {
       delete obj.status;
       obj.isLate = true;
     }
+
+    // Keep limit default 0 as no-limit behavior.
+    if (obj.limit === "0") {
+      delete obj.limit;
+    }
+
+    // Keep sortBy default as All and avoid sending sortOrder without sortBy.
+    if (!obj.sortBy) {
+      delete obj.sortBy;
+      delete obj.sortOrder;
+    }
+
     // Build query string from filters
     const query = new URLSearchParams(obj);
     setParams(query);
@@ -118,8 +130,8 @@ export default function Component({ staffs = [] }) {
               <div className="mb-2 block">
                 <Label htmlFor="sort" value="Sort By" />
               </div>
-              <Select id="sort" name="sortBy">
-                <option value="">Date</option>
+              <Select id="sort" name="sortBy" defaultValue="">
+                <option value="">All</option>
                 <option value="staffId">Staff</option>
                 <option value="totalWorkTime">Working Time</option>
                 <option value="breakTime">Break Time</option>

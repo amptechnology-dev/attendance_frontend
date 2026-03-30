@@ -6,7 +6,8 @@ export function LimitDropDown() {
       <div className="mb-2 block">
         <Label htmlFor="limit" value="Limit Results" />
       </div>
-      <Select id="limit" name="limit" defaultValue={50}>
+      <Select id="limit" name="limit" defaultValue="0">
+        <option value="0">0 (All)</option>
         <option value="20">20</option>
         <option value="50">50</option>
         <option value="100">100</option>

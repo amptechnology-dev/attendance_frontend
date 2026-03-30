@@ -8,6 +8,7 @@ export function AdminNavbar({ user = {} }) {
 
   const toggleSidebar = () => {
     const sidebar = document.getElementById("main_sidebar");
+    if (!sidebar) return;
     sidebar.classList.toggle("hidden");
     setSidebarOpen(!sidebarOpen);
   };

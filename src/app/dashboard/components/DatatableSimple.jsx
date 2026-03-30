@@ -32,6 +32,7 @@ export default function Datatable({
     pageSize: 20,
   });
   const [globalFilter, setGlobalFilter] = useState("");
+  const actionButtons = React.Children.toArray(Button);
 
   // Initialize the table instance with necessary configurations
   const table = useReactTable({
@@ -64,7 +65,7 @@ export default function Datatable({
             placeholder="Search..."
             className="flex-1 sm:flex-none"
           />
-          {Button}
+          {actionButtons}
         </div>
       </div>
 
