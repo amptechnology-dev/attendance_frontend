@@ -68,9 +68,18 @@ export const columns = [
     cell: (info) => {
       const totalMinutes = info.getValue();
       if (totalMinutes <= 0) return "-";
+      
       const hours = Math.floor(totalMinutes / 60);
       const minutes = Math.floor(totalMinutes % 60);
-      return `${hours}h ${minutes}m`;
+      
+      if (hours > 0 && minutes > 0) {
+        return `${hours} hours ${minutes} minutes`;
+      } else if (hours > 0) {
+        return `${hours} hours`;
+      } else if (minutes > 0) {
+        return `${minutes} minutes`;
+      }
+      return "-";
     },
   },
   // {
