@@ -4,6 +4,7 @@ import { format } from "date-fns";
 // import DeleteButton from "./delete";
 import AddExitButton from "./addExit";
 import EditEntryButton from "./editEntry";
+import { minutesToHM } from "@/lib/helpers";
 
 export const columns = [
   {
@@ -56,22 +57,7 @@ export const columns = [
   {
     accessorKey: "workingTime",
     header: "Working Time",
-    cell: (info) => {
-      const totalMinutes = info.getValue();
-      if (totalMinutes <= 0) return "-";
-      
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = Math.floor(totalMinutes % 60);
-      
-      if (hours > 0 && minutes > 0) {
-        return `${hours} hours ${minutes} minutes`;
-      } else if (hours > 0) {
-        return `${hours} hours`;
-      } else if (minutes > 0) {
-        return `${minutes} minutes`;
-      }
-      return "-";
-    },
+    cell: (info) => minutesToHM(info.getValue()),
   },
   {
     accessorKey: "remarks",

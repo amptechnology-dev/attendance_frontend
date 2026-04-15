@@ -5,6 +5,7 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { RiListView } from "react-icons/ri";
 import { differenceInMinutes } from "date-fns";
+import { minutesToHM } from "@/lib/helpers";
 
 export default function ViewButton({ name, logs = [] }) {
   const [openModal, setOpenModal] = useState(false); // Modal visibility state
@@ -42,9 +43,7 @@ export default function ViewButton({ name, logs = [] }) {
                       {log.exitTime ? format(log.exitTime, "hh:mm a") : "-"}
                     </Table.Cell>
                     <Table.Cell>
-                      {`${Math.floor(log.workingTime / 60)}h ${Math.floor(
-                        log.workingTime % 60
-                      )}m`}
+                      {minutesToHM(log.workingTime)}
                     </Table.Cell>
                     <Table.Cell>
                       {i > 0
@@ -53,9 +52,7 @@ export default function ViewButton({ name, logs = [] }) {
                               log.entryTime,
                               logs[i - 1].exitTime
                             );
-                            return `${Math.floor(breakMinutes / 60)}h ${
-                              breakMinutes % 60
-                            }m`;
+                            return minutesToHM(breakMinutes);
                           })()
                         : "-"}
                     </Table.Cell>

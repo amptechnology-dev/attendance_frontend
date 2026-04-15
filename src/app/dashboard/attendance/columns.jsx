@@ -1,6 +1,7 @@
 "use client";
 // import EditButton from "./edit";
 import { format } from "date-fns";
+import { minutesToHM } from "@/lib/helpers";
 import ViewLogsButton from "./viewLogs";
 import HrAdjustmentButton from "./hrAdjustment";
 import { Badge } from "flowbite-react";
@@ -65,22 +66,7 @@ export const columns = [
   {
     accessorKey: "totalWorkTime",
     header: "Work Time",
-    cell: (info) => {
-      const totalMinutes = info.getValue();
-      if (totalMinutes <= 0) return "-";
-      
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = Math.floor(totalMinutes % 60);
-      
-      if (hours > 0 && minutes > 0) {
-        return `${hours} hours ${minutes} minutes`;
-      } else if (hours > 0) {
-        return `${hours} hours`;
-      } else if (minutes > 0) {
-        return `${minutes} minutes`;
-      }
-      return "-";
-    },
+    cell: (info) => minutesToHM(info.getValue()),
   },
   // {
   //   accessorKey: "breakTime",

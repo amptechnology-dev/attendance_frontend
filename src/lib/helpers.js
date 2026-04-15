@@ -7,9 +7,22 @@ import {
 } from "date-fns";
 
 export function minutesToHM(totalMinutes) {
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = Math.floor(totalMinutes % 60);
-  return `${hours}h ${minutes}m`;
+  const total = Number(totalMinutes) || 0;
+  if (total <= 0) return "-";
+
+  const hours = Math.floor(total / 60);
+  const minutes = Math.floor(total % 60);
+  const parts = [];
+
+  if (hours > 0) {
+    parts.push(`${hours} hr${hours === 1 ? "" : "s"}`);
+  }
+
+  if (minutes > 0) {
+    parts.push(`${minutes} min${minutes === 1 ? "" : "s"}`);
+  }
+
+  return parts.length ? parts.join(" ") : "-";
 }
 
 export const filterLogsByDateRange = (logs, range = "today") => {
