@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-DOMAIN="https://attendance.amptechnology.in"   # ← change this to your actual domain
+DOMAIN="attendance.amptechnology.in"   # ← change this to your actual domain
 EMAIL="devs.amptechnology@gmail.com"
 APP_CONTAINER="attendance-frontend"
 APP_PORT="3011"
