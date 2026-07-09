@@ -95,7 +95,7 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
                                   </div>
                                 </div>
                               ) : (
-                                ""
+                                <div>A</div>
                               )}
                             </td>
                           );
