@@ -2,6 +2,7 @@ import TabsWithDatatable from "./tabs";
 import { fetchWithCookies } from "@/lib/fetchWithCookies";
 import { redirect } from "next/navigation";
 import CalculateAttendanceButton from "./calculateAttendance";
+import MissingAttendanceReport from "./MissingAttendanceReport";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ export const metadata = {
 
 export default async function Page() {
   const fetchLogs = await fetchWithCookies(
-    `${process.env.NEXT_PUBLIC_BACKEND_URI}/attendance/get?days=90`
+    `${process.env.NEXT_PUBLIC_BACKEND_URI}/attendance/get?days=90`,
   ).catch((error) => {
     if (error.message === "Unauthorized") {
       redirect("/auth/admin");
@@ -26,6 +27,7 @@ export default async function Page() {
       <div className="mb-5">
         <CalculateAttendanceButton />
       </div>
+      <MissingAttendanceReport />
       <TabsWithDatatable data={logs} />
     </div>
   );
