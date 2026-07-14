@@ -18,22 +18,22 @@ export default function EditableField({
 }) {
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [fieldValue, setFieldValue] = useState(value);
+  const [fieldValue, setFieldValue] = useState(value ?? ""); // ✅ never undefined
 
   useEffect(() => {
-    setFieldValue(value || ""); // Update when `staff` data loads
+    setFieldValue(value ?? ""); // Update when `staff` data loads
   }, [value]);
 
   const handleSave = () => {
     if (fieldValue === value) {
       setIsEditing(false);
-      return; // No change, so no update needed
+      return;
     }
     if (!allowBlank && fieldValue.trim() === "") {
       alert("Please enter a value");
       return;
     }
-    onSave(name, fieldValue); // Call parent handler
+    onSave(name, fieldValue);
     setIsEditing(false);
   };
 
@@ -44,7 +44,7 @@ export default function EditableField({
         label={label}
         type={type}
         name={name}
-        value={fieldValue}
+        value={fieldValue ?? ""} // ✅ extra safety, always a string
         disabled={!isEditing}
         onChange={(e) => setFieldValue(e.target.value)}
       />
@@ -62,7 +62,10 @@ export default function EditableField({
           <Button
             size="xs"
             color="red"
-            onClick={() => [setIsEditing(false), setFieldValue(value)]}
+            onClick={() => {
+              setIsEditing(false);
+              setFieldValue(value ?? "");
+            }}
           >
             <FaTimes />
           </Button>
