@@ -92,7 +92,7 @@ export default function Component({ data = {} }) {
                 <TextInput
                   type="text"
                   id="name"
-                  defaultValue={data.staff.fullName}
+                  defaultValue={data?.staff?.fullName}
                   disabled
                 />
               </div>
