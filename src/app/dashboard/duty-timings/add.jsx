@@ -156,7 +156,7 @@ export default function Component({ departmentId }) {
                     id="late_entry"
                     name="lateEntryTime"
                     min={0}
-                    max={59}
+                    max={60}
                     required
                   />
                 </div>

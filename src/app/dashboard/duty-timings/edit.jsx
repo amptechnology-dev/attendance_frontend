@@ -163,7 +163,7 @@ export default function Component({ data = {} }) {
                     name="lateEntryTime"
                     defaultValue={data?.lateEntryTime}
                     min={0}
-                    max={59}
+                    max={60}
                     required
                   />
                 </div>

@@ -2,7 +2,7 @@
 
 import { Button, Spinner, Badge, Select } from "flowbite-react";
 import { useState, useEffect, useCallback } from "react";
-import { RiDvdAiLine, RiCalendarCheckLine } from "react-icons/ri";
+import { RiDvdAiLine, RiCalendarCheckLine, RiLockLine } from "react-icons/ri";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/context/auth.context";
@@ -58,20 +58,30 @@ export default function MissingAttendanceReport() {
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URI}/attendance/missing-attendance-report?month=${month}&year=${year}`,
-        { credentials: "include" }
+        { credentials: "include" },
       );
       const result = await response.json();
 
       if (response.ok) {
-        setMissingDates(result.data || []);
+        // ✅ FIX: chronological order নিশ্চিত করা হচ্ছে client-side এও,
+        // যাতে "earliest = unlockable" লজিক সবসময় সঠিক date-এর উপর কাজ করে
+        const sorted = [...(result.data || [])].sort(
+          (a, b) => new Date(a.date) - new Date(b.date)
+        );
+        setMissingDates(sorted);
       } else {
-        toast.error(result.message || "Failed to fetch missing attendance report.", {
-          position: "bottom-right",
-        });
+        toast.error(
+          result.message || "Failed to fetch missing attendance report.",
+          {
+            position: "bottom-right",
+          },
+        );
       }
     } catch (error) {
       console.error("Missing attendance report fetch error:", error);
-      toast.error("An unexpected error occurred.", { position: "bottom-right" });
+      toast.error("An unexpected error occurred.", {
+        position: "bottom-right",
+      });
     } finally {
       setIsFetching(false);
     }
@@ -94,7 +104,7 @@ export default function MissingAttendanceReport() {
 
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URI}/attendance/calculate-by-date/${formattedDate}`,
-        { credentials: "include" }
+        { credentials: "include" },
       );
       const result = await response.json();
 
@@ -111,7 +121,9 @@ export default function MissingAttendanceReport() {
       }
     } catch (error) {
       console.error("Attendance calculation error:", error);
-      toast.error("An unexpected error occurred.", { position: "bottom-right" });
+      toast.error("An unexpected error occurred.", {
+        position: "bottom-right",
+      });
     } finally {
       setCalculatingDate(null);
     }
@@ -126,6 +138,10 @@ export default function MissingAttendanceReport() {
 
   const visibleDates = missingDates.slice(0, visibleCount);
   const hasMore = visibleCount < missingDates.length;
+
+  // ✅ FIX: শুধু সবচেয়ে পুরনো (chronologically first) missing date-ই unlocked থাকবে।
+  // missingDates ইতিমধ্যে ascending order-এ sorted, তাই index 0 মানেই earliest.
+  const earliestMissingDate = missingDates.length > 0 ? missingDates[0].date : null;
 
   return (
     <div className="w-full">
@@ -165,6 +181,13 @@ export default function MissingAttendanceReport() {
         </div>
       </div>
 
+      {/* Hint when locked dates exist */}
+      {missingDates.length > 1 && (
+        <p className="text-xs text-gray-500 mb-3">
+          Attendance can only be calculated for the oldest pending date. After that date is successfully calculated, the next pending date will be unlocked automatically.
+        </p>
+      )}
+
       {/* Content */}
       {isFetching ? (
         <div className="flex justify-center items-center py-10">
@@ -179,26 +202,41 @@ export default function MissingAttendanceReport() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {visibleDates.map((item) => {
               const isRowLoading = calculatingDate === item.date;
+              // ✅ FIX: এই date-টাই কি এখন unlocked (earliest) date?
+              const isLocked = item.date !== earliestMissingDate;
+
               return (
                 <div
                   key={item.date}
-                  className="flex flex-col items-center justify-between gap-2 border rounded-lg px-3 py-4 bg-white dark:bg-gray-800 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow"
+                  className={`flex flex-col items-center justify-between gap-2 border rounded-lg px-3 py-4 shadow-sm transition-shadow ${
+                    isLocked
+                      ? "bg-gray-50 dark:bg-gray-900 border-dashed opacity-70"
+                      : "bg-white dark:bg-gray-800 hover:shadow-md"
+                  } dark:border-gray-700`}
                 >
                   <span className="font-medium text-sm text-center">
                     {formatDate(item.date)}
                   </span>
 
-                  <Badge color="warning">{item.employeeCount} employees</Badge>
-
                   <Button
                     size="xs"
-                    color="success"
-                    disabled={isRowLoading}
+                    color={isLocked ? "gray" : "success"}
+                    disabled={isRowLoading || isLocked}
                     onClick={() => handleCalculate(item.date)}
                     className="w-full"
+                    title={
+                      isLocked
+                        ? "আগের তারিখগুলো আগে calculate করুন"
+                        : "Calculate attendance"
+                    }
                   >
                     {isRowLoading ? (
                       <Spinner size="sm" />
+                    ) : isLocked ? (
+                      <>
+                        <RiLockLine className="mr-1 h-3 w-3" />
+                        Locked
+                      </>
                     ) : (
                       <>
                         <RiDvdAiLine className="mr-1 h-3 w-3" />
