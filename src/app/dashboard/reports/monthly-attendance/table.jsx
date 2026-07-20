@@ -5,16 +5,33 @@ import { Modal, Button, Label, Radio, Badge } from "flowbite-react";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 
+const ADJUSTMENT_OPTIONS = {
+  present: [
+    { id: "bulk-atoh", value: "Present to Half-day", label: "Present to Half-day" },
+    { id: "bulk-ptof", value: "Present to Full-day", label: "Present to Full-day" },
+    { id: "bulk-hourly", value: "Hourly", label: "Hourly" },
+  ],
+  "half-day": [
+    { id: "bulk-htof", value: "Half-day to Full-day", label: "Half-day to Full-day" },
+  ],
+  absent: [
+    { id: "bulk-atoh2", value: "Absent to Half-day", label: "Absent to Half-day" },
+    { id: "bulk-atof", value: "Absent to Full-day", label: "Absent to Full-day" },
+  ],
+};
+
 export default function AttendanceTable({ data = [], days = [], month = "" }) {
   const reportRef = useRef();
   const [isGenerating, setIsGenerating] = useState(false);
   const router = useRouter();
 
-  // ✅ NEW: bulk selection state — Map of attendanceId -> { staffName, dateLabel }
   const [selected, setSelected] = useState(new Map());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [adjustment, setAdjustment] = useState("None");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const selectedStatus = Array.from(selected.values())[0]?.status;
+  const availableAdjustments = ADJUSTMENT_OPTIONS[selectedStatus] || [];
 
   const handleDownload = async () => {
     setIsGenerating(true);
@@ -43,23 +60,46 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
     }
   };
 
-  // ✅ NEW: cell click -> toggle selection of that attendance record
-  const toggleSelect = (record, staffName, dateLabel) => {
-    if (!record?._id) return; // no attendance record for this cell (shouldn't normally happen)
+    const toggleSelect = (record, staffName, dateLabel) => {
+    if (!record?._id) return;
+
+    if (record.status === "absent") {
+      return;
+    }
+
+    // Deselect — always allowed
+    if (selected.has(record._id)) {
+      setSelected((prev) => {
+        const next = new Map(prev);
+        next.delete(record._id);
+        return next;
+      });
+      return;
+    }
+
+    // Validation setState updater-এর বাইরে — যাতে Strict Mode-এ toast duplicate না হয়
+    const existingStatuses = new Set(
+      Array.from(selected.values()).map((item) => item.status)
+    );
+
+    if (existingStatuses.size > 0 && !existingStatuses.has(record.status)) {
+      const existingStatus = Array.from(existingStatuses)[0];
+      toast.error(
+        `You can only select records with the same status. Already selected: "${getStatusAbbreviation(existingStatus)}", this one is "${getStatusAbbreviation(record.status)}".`,
+        { position: "bottom-right", toastId: "status-mismatch" }
+      );
+      return;
+    }
+
     setSelected((prev) => {
       const next = new Map(prev);
-      if (next.has(record._id)) {
-        next.delete(record._id);
-      } else {
-        next.set(record._id, { staffName, dateLabel, status: record.status });
-      }
+      next.set(record._id, { staffName, dateLabel, status: record.status });
       return next;
     });
   };
 
   const clearSelection = () => setSelected(new Map());
 
-  // ✅ NEW: submit bulk adjustment
   const handleBulkSubmit = async () => {
     if (selected.size === 0) return;
     setIsSubmitting(true);
@@ -140,14 +180,19 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
           )}
         </button>
 
-        {/* ✅ NEW: bulk action bar — শুধু কিছু সিলেক্ট থাকলে দেখাবে */}
         {selected.size > 0 && (
           <div className="flex items-center gap-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
             <Badge color="info">{selected.size} selected</Badge>
+            <Badge color="gray">
+              Status: {getStatusAbbreviation(Array.from(selected.values())[0]?.status)}
+            </Badge>
             <Button
               size="xs"
               color="success"
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => {
+                setAdjustment("None");
+                setIsModalOpen(true);
+              }}
             >
               Adjust Selected
             </Button>
@@ -260,7 +305,6 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
                             >
                               {record ? (
                                 <div className="relative">
-                                  {/* ✅ NEW: ছোট চেকমার্ক ইন্ডিকেটর, সিলেক্ট হলে দেখাবে */}
                                   {isSelected && (
                                     <span className="absolute -top-0.5 -right-0.5 text-blue-700 text-[9px] font-bold">
                                       ✓
@@ -309,13 +353,12 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
         </div>
       </div>
 
-      {/* ✅ NEW: Bulk HR Adjustment Modal */}
+      {/* Bulk HR Adjustment Modal */}
       <Modal show={isModalOpen} onClose={() => setIsModalOpen(false)} size="md">
         <Modal.Header>
           Bulk HR Adjustment ({selected.size} selected)
         </Modal.Header>
         <Modal.Body>
-          {/* ✅ সিলেক্টেড রেকর্ডগুলোর প্রিভিউ লিস্ট */}
           <div className="mb-4 max-h-40 overflow-y-auto border rounded-lg p-2 bg-gray-50">
             {Array.from(selected.values()).map((item, idx) => (
               <div
@@ -341,39 +384,21 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
               />
               <Label htmlFor="bulk-none">None</Label>
             </div>
-            <div className="flex items-center gap-2">
-              <Radio
-                id="bulk-htof"
-                name="bulk-adjustments"
-                value="Half-day to Full-day"
-                checked={adjustment === "Half-day to Full-day"}
-                onChange={() => setAdjustment("Half-day to Full-day")}
-              />
-              <Label htmlFor="bulk-htof">Half-day to Full-day</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Radio
-                id="bulk-atoh"
-                name="bulk-adjustments"
-                value="Present to Half-day"
-                checked={adjustment === "Present to Half-day"}
-                onChange={() => setAdjustment("Present to Half-day")}
-              />
-              <Label htmlFor="bulk-atoh">Present to Half-day</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Radio
-                id="bulk-hourly"
-                name="bulk-adjustments"
-                value="Hourly"
-                checked={adjustment === "Hourly"}
-                onChange={() => setAdjustment("Hourly")}
-              />
-              <Label htmlFor="bulk-hourly">Hourly</Label>
-            </div>
+
+            {availableAdjustments.map((opt) => (
+              <div key={opt.id} className="flex items-center gap-2">
+                <Radio
+                  id={opt.id}
+                  name="bulk-adjustments"
+                  value={opt.value}
+                  checked={adjustment === opt.value}
+                  onChange={() => setAdjustment(opt.value)}
+                />
+                <Label htmlFor={opt.id}>{opt.label}</Label>
+              </div>
+            ))}
           </fieldset>
 
-          {/* ✅ প্রিভিউ — এই adjustment apply হলে কী দাঁড়াবে */}
           {adjustment !== "None" && (
             <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
               <strong>{selected.size}</strong> record(s) will be changed to{" "}
