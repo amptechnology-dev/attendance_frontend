@@ -11,7 +11,9 @@ const ADJUSTMENT_OPTIONS = {
     { value: "Present to Full-day", label: "Present to Full-day" },
     { value: "Hourly", label: "Hourly" },
   ],
-  "half-day": [{ value: "Half-day to Full-day", label: "Half-day to Full-day" }],
+  "half-day": [
+    { value: "Half-day to Full-day", label: "Half-day to Full-day" },
+  ],
   absent: [
     { value: "Absent to Half-day", label: "Absent to Half-day" },
     { value: "Absent to Full-day", label: "Absent to Full-day" },
@@ -68,7 +70,9 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
       window.open(url);
     } catch (err) {
       console.error("PDF generation failed:", err);
-      toast.error("PDF generate korte problem hoyeche.", { position: "bottom-right" });
+      toast.error("PDF generate korte problem hoyeche.", {
+        position: "bottom-right",
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -223,10 +227,27 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
         );
       });
 
-      closeStatusModal();
-      router.refresh();
+      if (failed.length === 0) {
+        closeStatusModal();
+        router.refresh();
+      } else {
+        setRowSelections((prev) => {
+          const next = new Map(prev);
+          const failedIds = new Set(failed.map((f) => f.recordId));
+          results.forEach((r) => {
+            if (!failedIds.has(r.recordId)) {
+              const current = next.get(r.recordId);
+              next.set(r.recordId, { ...current, selected: false });
+            }
+          });
+          return next;
+        });
+        router.refresh();
+      }
     } catch (error) {
-      toast.error("An unexpected error occurred.", { position: "bottom-right" });
+      toast.error("An unexpected error occurred.", {
+        position: "bottom-right",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -279,13 +300,27 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
           {/* Legend now stays glued to the first department's block, not
               floating alone as its own page-1 content. */}
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs border border-gray-300 rounded-md px-3 py-2 bg-gray-50 text-gray-700">
-            <span><strong className="text-gray-900">FD</strong> : Full Day</span>
-            <span><strong className="text-gray-900">HD</strong> : Half Day</span>
-            <span><strong className="text-gray-900">P</strong> : Only Present</span>
-            <span><strong className="text-gray-900">A</strong> : Absent</span>
-            <span><strong className="text-gray-900">WO</strong> : Week Off</span>
-            <span><strong className="text-gray-900">H</strong> : Holiday</span>
-            <span><strong className="text-gray-900">HA</strong> : HR Adjustment</span>
+            <span>
+              <strong className="text-gray-900">FD</strong> : Full Day
+            </span>
+            <span>
+              <strong className="text-gray-900">HD</strong> : Half Day
+            </span>
+            <span>
+              <strong className="text-gray-900">P</strong> : Only Present
+            </span>
+            <span>
+              <strong className="text-gray-900">A</strong> : Absent
+            </span>
+            <span>
+              <strong className="text-gray-900">WO</strong> : Week Off
+            </span>
+            <span>
+              <strong className="text-gray-900">H</strong> : Holiday
+            </span>
+            <span>
+              <strong className="text-gray-900">HA</strong> : HR Adjustment
+            </span>
           </div>
 
           {data?.map((dept, deptIdx) => (
@@ -332,18 +367,30 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
                           {d.getDate()}
                         </th>
                       ))}
-                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">FD</th>
-                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">HD</th>
-                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">P</th>
-                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">A</th>
-                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">HA</th>
+                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
+                        FD
+                      </th>
+                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
+                        HD
+                      </th>
+                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
+                        P
+                      </th>
+                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
+                        A
+                      </th>
+                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
+                        HA
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {dept.staffReports.map((staff, staffIdx) => (
                       <tr
                         key={staff.staffId}
-                        className={staffIdx % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                        className={
+                          staffIdx % 2 === 0 ? "bg-white" : "bg-gray-50"
+                        }
                       >
                         <td className="border border-gray-300 p-1.5 sticky left-0 bg-inherit whitespace-nowrap text-xs font-medium align-middle">
                           {staff.staffName}
