@@ -21,8 +21,10 @@ function buildLogsUrl(baseUrl, searchParams) {
 }
 
 export default async function Page({ searchParams }) {
+  const params = await searchParams; 
+
   const baseUrl = `${process.env.NEXT_PUBLIC_BACKEND_URI}/entry-exit-log/get`;
-  const logsUrl = buildLogsUrl(baseUrl, searchParams);
+  const logsUrl = buildLogsUrl(baseUrl, params);
 
   const fetchLogs = await fetchWithCookies(logsUrl).catch((error) => {
     if (error.message === "Unauthorized") {
@@ -45,11 +47,11 @@ export default async function Page({ searchParams }) {
   const staffs = fetchStaffs?.data;
   const departments = fetchDepartments?.data;
 
-  const filterLabel = searchParams.startDate
-    ? `${searchParams.startDate} to ${searchParams.endDate}`
-    : searchParams.date
-    ? searchParams.date
-    : `Last ${searchParams.days || 90} days`;
+  const filterLabel = params.startDate
+    ? `${params.startDate} to ${params.endDate}`
+    : params.date
+    ? params.date
+    : `Last ${params.days || 90} days`;
 
   return (
     <div>

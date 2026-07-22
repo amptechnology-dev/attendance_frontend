@@ -23,8 +23,10 @@ function buildAttendanceUrl(baseUrl, searchParams) {
 }
 
 export default async function Page({ searchParams }) {
+  const params = await searchParams; // 👈 Next.js 15 fix
+
   const baseUrl = `${process.env.NEXT_PUBLIC_BACKEND_URI}/attendance/get`;
-  const logsUrl = buildAttendanceUrl(baseUrl, searchParams);
+  const logsUrl = buildAttendanceUrl(baseUrl, params);
 
   const fetchLogs = await fetchWithCookies(logsUrl).catch((error) => {
     if (error.message === "Unauthorized") {
@@ -35,11 +37,11 @@ export default async function Page({ searchParams }) {
 
   const logs = fetchLogs?.data;
 
-  const filterLabel = searchParams.startDate
-    ? `${searchParams.startDate} to ${searchParams.endDate}`
-    : searchParams.date
-    ? searchParams.date
-    : `Last ${searchParams.days || 90} days`;
+  const filterLabel = params.startDate
+    ? `${params.startDate} to ${params.endDate}`
+    : params.date
+    ? params.date
+    : `Last ${params.days || 90} days`;
 
   return (
     <div>

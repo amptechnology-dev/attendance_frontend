@@ -7,7 +7,7 @@ import { FiZap, FiClock, FiList, FiCalendar, FiFilter } from "react-icons/fi";
 import FilterModal from "../components/FilterModal";
 import { filterLogsByDateRange } from "@/lib/helpers";
 
-export default function tabs({ data, filterLabel }) {
+export default function AttendanceTabs({ data, filterLabel }) {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const todayLogs = filterLogsByDateRange(data, "today");

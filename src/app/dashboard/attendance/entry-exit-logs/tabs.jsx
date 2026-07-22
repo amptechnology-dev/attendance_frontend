@@ -8,7 +8,7 @@ import AddButton from "./addEntry";
 import FilterModal from "../../components/FilterModal";
 import { filterLogsByDateRange } from "@/lib/helpers";
 
-export default function tabs({
+export default function EntryExitTabs({
   data,
   staffs = [],
   departments = [],
