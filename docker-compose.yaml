@@ -9,7 +9,6 @@ services:
       - "3011"
     networks:
       - app-network
-    ports: [] # no host port needed, nginx handles it
 
 networks:
   app-network:
