@@ -18,7 +18,7 @@ export default function Component({ staffs = [], departments = [] }) {
   useEffect(() => {
     if (selectedDepartment) {
       setFilteredStaffs(
-        staffs.filter((staff) => staff.department._id === selectedDepartment)
+        staffs.filter((staff) => staff?.department?._id === selectedDepartment)
       );
     } else {
       setFilteredStaffs(staffs); // Reset to all staffs (fallback)

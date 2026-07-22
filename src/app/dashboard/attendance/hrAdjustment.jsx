@@ -117,6 +117,31 @@ export default function ViewButton({ id, data = {} }) {
                 <Radio id="hourly" name="adjustments" value="Hourly" />
                 <Label htmlFor="hourly">Hourly</Label>
               </div>
+              {/* FIX: নতুন ৩টা adjustment option যোগ করা হলো */}
+              <div className="flex items-center gap-2">
+                <Radio
+                  id="ptof"
+                  name="adjustments"
+                  value="Present to Full-day"
+                />
+                <Label htmlFor="ptof">Present to Full-day</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Radio
+                  id="atoh2"
+                  name="adjustments"
+                  value="Absent to Half-day"
+                />
+                <Label htmlFor="atoh2">Absent to Half-day</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Radio
+                  id="atof"
+                  name="adjustments"
+                  value="Absent to Full-day"
+                />
+                <Label htmlFor="atof">Absent to Full-day</Label>
+              </div>
             </fieldset>
             <div className="flex gap-2 mt-4">
               <Button color="success" size="sm" type="submit">

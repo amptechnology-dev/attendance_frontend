@@ -1,10 +1,23 @@
 "use client";
 // import EditButton from "./edit";
-import { format } from "date-fns";
+import { format, differenceInSeconds } from "date-fns";
 import { minutesToHM } from "@/lib/helpers";
 import ViewLogsButton from "./viewLogs";
 import HrAdjustmentButton from "./hrAdjustment";
-import { Badge } from "flowbite-react";
+import { Badge, Tooltip } from "flowbite-react";
+
+// সেকেন্ড থেকে "Xh Ym Zs" ফরম্যাটে দেখানোর জন্য helper
+const formatHMS = (totalSeconds) => {
+  if (totalSeconds == null || totalSeconds < 0) return "-";
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const parts = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0) parts.push(`${m}m`);
+  parts.push(`${s}s`);
+  return parts.join(" ");
+};
 
 export const columns = [
   {
@@ -27,11 +40,26 @@ export const columns = [
     cell: ({ row }) => {
       const logs = row.original.logs;
       if (logs && logs.length > 0) {
-        const entryTime = format(logs[0].entryTime, "hh:mma");
-        const exitTime = logs[logs.length - 1].exitTime
-          ? format(logs[logs.length - 1].exitTime, "hh:mma")
+        const firstLog = logs[0];
+        const lastLog = logs[logs.length - 1];
+
+        const entryTime = format(firstLog.entryTime, "hh:mma");
+        const exitTime = lastLog.exitTime
+          ? format(lastLog.exitTime, "hh:mma")
           : "[No Exit]";
-        return `${entryTime} - ${exitTime}`;
+
+        const entryExact = format(firstLog.entryTime, "hh:mm:ss a");
+        const exitExact = lastLog.exitTime
+          ? format(lastLog.exitTime, "hh:mm:ss a")
+          : "[No Exit]";
+
+        return (
+          <Tooltip content={`Entry: ${entryExact}  |  Exit: ${exitExact}`}>
+            <span className="cursor-help border-b border-dotted border-gray-400">
+              {entryTime} - {exitTime}
+            </span>
+          </Tooltip>
+        );
       }
       return "-";
     },
@@ -58,27 +86,39 @@ export const columns = [
     header: "2nd Half",
     cell: (info) => info.getValue(),
   },
-  // {
-  //   accessorKey: "entryTime",
-  //   header: "Entry Time",
-  //   cell: (info) => format(info.getValue(), "hh:mm a"),
-  // },
   {
     accessorKey: "totalWorkTime",
     header: "Work Time",
-    cell: (info) => minutesToHM(info.getValue()),
+    cell: ({ row }) => {
+      const totalMinutes = row.original.totalWorkTime;
+      const logs = row.original.logs;
+
+      const display = minutesToHM(totalMinutes);
+
+      // FIX: সব session মিলিয়ে exact সেকেন্ড-precision total বের করা হচ্ছে,
+      // যাতে hover করলে দেখা যায় ৩৪ মিনিট কেন, ৩৫ না — exact সেকেন্ড সহ প্রমাণ
+      let exactSeconds = 0;
+      let hasCompletedSession = false;
+      if (logs && logs.length > 0) {
+        logs.forEach((log) => {
+          if (log.exitTime) {
+            exactSeconds += differenceInSeconds(log.exitTime, log.entryTime);
+            hasCompletedSession = true;
+          }
+        });
+      }
+
+      if (!hasCompletedSession) return display;
+
+      return (
+        <Tooltip content={`Exact: ${formatHMS(exactSeconds)}`}>
+          <span className="cursor-help border-b border-dotted border-gray-400">
+            {display}
+          </span>
+        </Tooltip>
+      );
+    },
   },
-  // {
-  //   accessorKey: "breakTime",
-  //   header: "Break Time",
-  //   cell: (info) => {
-  //     const totalMinutes = info.getValue();
-  //     if (totalMinutes <= 0) return "-";
-  //     const hours = Math.floor(totalMinutes / 60);
-  //     const minutes = totalMinutes % 60;
-  //     return `${hours}h ${minutes}m`;
-  //   },
-  // },
   {
     accessorKey: "status",
     header: "Status",

@@ -2,10 +2,22 @@
 
 import { Button, Modal, Table, Tooltip } from "flowbite-react";
 import { useState } from "react";
-import { format } from "date-fns";
+import { format, differenceInSeconds } from "date-fns";
 import { RiListView } from "react-icons/ri";
-import { differenceInMinutes } from "date-fns";
-import { minutesToHM } from "@/lib/helpers";
+
+// সেকেন্ড থেকে "Xh Ym Zs" ফরম্যাটে দেখানোর জন্য নতুন helper
+// (আগের minutesToHM মিনিট-precision-এ কাজ করতো, সেকেন্ড হারিয়ে যেত)
+const formatHMS = (totalSeconds) => {
+  if (totalSeconds == null || totalSeconds < 0) return "-";
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const parts = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0) parts.push(`${m}m`);
+  parts.push(`${s}s`); // সেকেন্ড সবসময় দেখানো হবে, transparency-এর জন্য
+  return parts.join(" ");
+};
 
 export default function ViewButton({ name, logs = [] }) {
   const [openModal, setOpenModal] = useState(false); // Modal visibility state
@@ -38,22 +50,21 @@ export default function ViewButton({ name, logs = [] }) {
                 {logs.map((log, i) => (
                   <Table.Row className="bg-white" key={i}>
                     <Table.Cell>{log.slNo}</Table.Cell>
-                    <Table.Cell>{format(log.entryTime, "hh:mm a")}</Table.Cell>
+                    {/* FIX: এখন সেকেন্ড সহ দেখাবে, যাতে exact punch time বোঝা যায় */}
+                    <Table.Cell>{format(log.entryTime, "hh:mm:ss a")}</Table.Cell>
                     <Table.Cell>
-                      {log.exitTime ? format(log.exitTime, "hh:mm a") : "-"}
+                      {log.exitTime ? format(log.exitTime, "hh:mm:ss a") : "-"}
                     </Table.Cell>
                     <Table.Cell>
-                      {minutesToHM(log.workingTime)}
+                      {/* FIX: stored (rounded) workingTime-এর বদলে সরাসরি entry/exit
+                          থেকে সেকেন্ড-precision এ হিসাব করা হচ্ছে */}
+                      {log.exitTime
+                        ? formatHMS(differenceInSeconds(log.exitTime, log.entryTime))
+                        : "-"}
                     </Table.Cell>
                     <Table.Cell>
-                      {i > 0
-                        ? (() => {
-                            const breakMinutes = differenceInMinutes(
-                              log.entryTime,
-                              logs[i - 1].exitTime
-                            );
-                            return minutesToHM(breakMinutes);
-                          })()
+                      {i > 0 && logs[i - 1].exitTime
+                        ? formatHMS(differenceInSeconds(log.entryTime, logs[i - 1].exitTime))
                         : "-"}
                     </Table.Cell>
                   </Table.Row>
