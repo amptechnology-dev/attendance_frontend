@@ -46,7 +46,7 @@ export default async function Page({ searchParams }) {
   return (
     <div>
       <div className="mb-5">
-        <CalculateAttendanceButton />
+        {/* <CalculateAttendanceButton /> */}
       </div>
       <MissingAttendanceReport />
       <TabsWithDatatable data={logs} filterLabel={filterLabel} />
