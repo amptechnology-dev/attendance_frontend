@@ -1,7 +1,8 @@
 "use client";
 
 import { Sidebar } from "flowbite-react";
-import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
+import { useTransition } from "react";
 import {
   HiChartPie,
   HiOutlineBriefcase,
@@ -23,21 +24,104 @@ import {
 import { BsCalendarX, BsPersonFillCheck } from "react-icons/bs";
 import { FaWallet, FaChartPie, FaUserClock } from "react-icons/fa";
 import { TbMoneybag, TbCreditCardPay, TbReport } from "react-icons/tb";
-import { usePathname } from "next/navigation";
 import { useAuth } from "@/app/context/auth.context";
 import { hasPermission } from "@/lib/permissions";
 import { permissions } from "@/lib/constants";
 
 const customTheme = {
   item: {
-    active: "bg-blue-100 text-blue-900 dark:bg-blue-700 dark:text-white", // Updated active styles
+    active: "bg-blue-100 text-blue-900 dark:bg-blue-700 dark:text-white",
   },
 };
 
-function NavItem({ href, icon, active, children }) {
+// Static path arrays — component এর বাইরে, যাতে প্রতি render এ নতুন array তৈরি না হয়
+const DATE_TIME_PATHS = [
+  "/dashboard/year-and-month",
+  "/dashboard/duty-timings",
+  "/dashboard/holidays",
+  "/dashboard/week-offs",
+];
+
+const ATTENDANCE_PATHS = [
+  "/dashboard/attendance/entry-exit-logs",
+  "/dashboard/attendance",
+  "/dashboard/attendance/today",
+  "/dashboard/attendance/leaves",
+  "/dashboard/attendance/holiday-fund",
+];
+
+const SALARY_PATHS = [
+  "/dashboard/salary/structure",
+  "/dashboard/salary",
+  "/dashboard/salary/advance",
+  "/dashboard/salary/pay-slip",
+];
+
+const REPORTS_PATHS = [
+  "/dashboard/reports/attendance",
+  "/dashboard/reports/monthly-attendance",
+  "/dashboard/reports/yearly-attendance",
+  "/dashboard/reports/salary",
+  "/dashboard/reports/monthly-salary",
+  "/dashboard/reports/leaves",
+  "/dashboard/reports/attendance-advance",
+  "/dashboard/reports/performance",
+  "/dashboard/reports/pf-ecr",
+  "/dashboard/reports/esi-ecr",
+  "/dashboard/reports/holiday-fund",
+];
+
+function Spinner() {
   return (
-    <Sidebar.Item as={Link} href={href} icon={icon} active={active}>
-      {children}
+    <svg
+      className="h-4 w-4 animate-spin text-blue-600 dark:text-white"
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+      />
+    </svg>
+  );
+}
+
+function NavItem({ href, icon, active, children }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  const handleClick = (e) => {
+    e.preventDefault();
+    if (active || isPending) return; // already on this page or already loading
+    startTransition(() => {
+      router.push(href);
+    });
+  };
+
+  return (
+    <Sidebar.Item
+      as="a"
+      href={href}
+      icon={icon}
+      active={active}
+      onClick={handleClick}
+      onMouseEnter={() => router.prefetch(href)}
+      className={isPending ? "cursor-wait opacity-70" : ""}
+    >
+      <span className="flex w-full items-center justify-between">
+        <span>{children}</span>
+        {isPending && <Spinner />}
+      </span>
     </Sidebar.Item>
   );
 }
@@ -64,6 +148,7 @@ export function AdminSidebar() {
           >
             Dashboard
           </NavItem>
+
           {hasPermission(user, permissions.VIEW_DEPARTMENTS) && (
             <NavItem
               href="/dashboard/departments"
@@ -73,15 +158,11 @@ export function AdminSidebar() {
               Departments
             </NavItem>
           )}
+
           <Sidebar.Collapse
             icon={HiOutlineAdjustments}
             label="Date and Time"
-            open={isAnyChildActive([
-              "/dashboard/year-and-month",
-              "/dashboard/duty-timings",
-              "/dashboard/holidays",
-              "/dashboard/week-offs",
-            ])}
+            open={isAnyChildActive(DATE_TIME_PATHS)}
           >
             <NavItem
               href="/dashboard/duty-timings"
@@ -114,6 +195,7 @@ export function AdminSidebar() {
               </NavItem>
             )}
           </Sidebar.Collapse>
+
           {hasPermission(user, permissions.VIEW_STAFFS) && (
             <NavItem
               href="/dashboard/staffs"
@@ -123,16 +205,11 @@ export function AdminSidebar() {
               Manage Staffs
             </NavItem>
           )}
+
           <Sidebar.Collapse
             icon={HiClipboardList}
             label="Attendence"
-            open={isAnyChildActive([
-              "/dashboard/attendance/entry-exit-logs",
-              "/dashboard/attendance",
-              "/dashboard/attendance/today",
-              "/dashboard/attendance/leaves",
-              "/dashboard/attendance/holiday-fund",
-            ])}
+            open={isAnyChildActive(ATTENDANCE_PATHS)}
           >
             {hasPermission(user, permissions.VIEW_ENTRY_LOGS) && (
               <NavItem
@@ -185,12 +262,7 @@ export function AdminSidebar() {
             <Sidebar.Collapse
               icon={HiCash}
               label="Salary"
-              open={isAnyChildActive([
-                "/dashboard/salary/structure",
-                "/dashboard/salary",
-                "/dashboard/salary/advance",
-                "/dashboard/salary/pay-slip",
-              ])}
+              open={isAnyChildActive(SALARY_PATHS)}
             >
               <NavItem
                 href="/dashboard/salary/structure"
@@ -227,19 +299,7 @@ export function AdminSidebar() {
             <Sidebar.Collapse
               icon={HiDocumentReport}
               label="Reports"
-              open={isAnyChildActive([
-                "/dashboard/reports/attendance",
-                "/dashboard/reports/monthly-attendance",
-                "/dashboard/reports/yearly-attendance",
-                "/dashboard/reports/salary",
-                "/dashboard/reports/monthly-salary",
-                "/dashboard/reports/leaves",
-                "/dashboard/reports/attendance-advance",
-                "/dashboard/reports/performance",
-                "/dashboard/reports/pf-ecr",
-                "/dashboard/reports/esi-ecr",
-                "/dashboard/reports/holiday-fund",
-              ])}
+              open={isAnyChildActive(REPORTS_PATHS)}
             >
               <NavItem
                 href="/dashboard/reports/attendance"
