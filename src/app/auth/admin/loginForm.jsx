@@ -124,7 +124,7 @@ export default function Login() {
         </div>
 
         <div className="text-center mb-7">
-          <h2 className="text-2xl font-bold text-gray-900">Admin Portal</h2>
+          <h2 className="text-2xl font-bold text-white">Admin Portal</h2>
           <p className="text-sm text-white mt-1">
             {step === "password"
               ? "Sign in to your account"
@@ -329,7 +329,7 @@ export default function Login() {
         <div className="mt-7 pt-5 border-t border-gray-100 text-center">
           <p className="text-xs text-white mb-1">Facing any issues?</p>
           <a
-            className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition"
+            className="text-sm font-semibold text-white hover:text-white transition"
             href="tel:8697972001"
           >
             📞 8697972001

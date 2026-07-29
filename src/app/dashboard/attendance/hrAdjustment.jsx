@@ -11,7 +11,7 @@ import { hasPermission } from "@/lib/permissions";
 import { permissions } from "@/lib/constants";
 
 export default function ViewButton({ id, data = {} }) {
-  const [openModal, setOpenModal] = useState(false); // Modal visibility state
+  const [openModal, setOpenModal] = useState(false); 
   const router = useRouter();
 
   const { user } = useAuth();
@@ -29,7 +29,7 @@ export default function ViewButton({ id, data = {} }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(Object.fromEntries(formData)),
           credentials: "include",
-        }
+        },
       );
 
       if (response.ok) {
@@ -117,7 +117,7 @@ export default function ViewButton({ id, data = {} }) {
                 <Radio id="hourly" name="adjustments" value="Hourly" />
                 <Label htmlFor="hourly">Hourly</Label>
               </div>
-              {/* FIX: নতুন ৩টা adjustment option যোগ করা হলো */}
+
               <div className="flex items-center gap-2">
                 <Radio
                   id="ptof"
@@ -142,6 +142,27 @@ export default function ViewButton({ id, data = {} }) {
                 />
                 <Label htmlFor="atof">Absent to Full-day</Label>
               </div>
+
+              <div className="flex items-center gap-2">
+                <Radio id="ptoa" name="adjustments" value="Present to Absent" />
+                <Label htmlFor="ptoa">Present to Absent</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Radio
+                  id="htoa"
+                  name="adjustments"
+                  value="Half-day to Absent"
+                />
+                <Label htmlFor="htoa">Half-day to Absent</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Radio
+                  id="ftoa"
+                  name="adjustments"
+                  value="Full-day to Absent"
+                />
+                <Label htmlFor="ftoa">Full-day to Absent</Label>
+              </div>
             </fieldset>
             <div className="flex gap-2 mt-4">
               <Button color="success" size="sm" type="submit">
@@ -153,7 +174,7 @@ export default function ViewButton({ id, data = {} }) {
                 type="reset"
                 onClick={() => setOpenModal(false)}
               >
-                Cancle
+                Cancel
               </Button>
             </div>
           </form>

@@ -9,10 +9,15 @@ const ADJUSTMENT_OPTIONS = {
   present: [
     { value: "Present to Half-day", label: "Present to Half-day" },
     { value: "Present to Full-day", label: "Present to Full-day" },
+    { value: "Present to Absent", label: "Present to Absent" },
     { value: "Hourly", label: "Hourly" },
   ],
   "half-day": [
     { value: "Half-day to Full-day", label: "Half-day to Full-day" },
+    { value: "Half-day to Absent", label: "Half-day to Absent" },
+  ],
+  "full-day": [
+    { value: "Full-day to Absent", label: "Full-day to Absent" },
   ],
   absent: [
     { value: "Absent to Half-day", label: "Absent to Half-day" },
@@ -20,7 +25,8 @@ const ADJUSTMENT_OPTIONS = {
   ],
 };
 
-const ADJUSTABLE_TYPES = ["present", "half-day"];
+// FIX: এখন present, half-day, full-day, absent — চারটাই adjustable
+const ADJUSTABLE_TYPES = ["present", "half-day", "full-day", "absent"];
 
 export default function AttendanceTable({ data = [], days = [], month = "" }) {
   const reportRef = useRef();
@@ -50,14 +56,6 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
           windowHeight: element.scrollHeight,
         },
         jsPDF: { unit: "in", format: "legal", orientation: "landscape" },
-        // Single page-break mechanism only: use the `before` selector for
-        // every dept-block EXCEPT the first one (via .dept-block-break),
-        // and only avoid breaking in the middle of a `tr` row. Avoiding
-        // the whole `.dept-block` (as before) forced the entire block to
-        // jump to the next page even if only a sliver overflowed the
-        // current one — that's what left page 1 (and the page between
-        // departments) blank. Also drop "legacy" mode since combining it
-        // with a manual inline pageBreakBefore double-triggered breaks.
         pagebreak: {
           mode: ["css"],
           before: ".dept-block-break",
@@ -297,8 +295,6 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
 
       <div ref={reportRef}>
         <div className="space-y-6">
-          {/* Legend now stays glued to the first department's block, not
-              floating alone as its own page-1 content. */}
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs border border-gray-300 rounded-md px-3 py-2 bg-gray-50 text-gray-700">
             <span>
               <strong className="text-gray-900">FD</strong> : Full Day
@@ -326,10 +322,6 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
           {data?.map((dept, deptIdx) => (
             <div
               key={dept._id}
-              // Only departments AFTER the first one get a forced page
-              // break, and it's driven purely by this CSS class (matched
-              // by pagebreak.before in html2pdf options) — no inline
-              // style, no duplicate break mechanism, no blank pages.
               className={`dept-block ${deptIdx > 0 ? "dept-block-break" : ""}`}
             >
               <div className="mb-2 flex items-center justify-between border-b-2 border-blue-600 pb-1">
@@ -346,19 +338,17 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
                   <thead>
                     <tr>
                       <th
-                        className="border border-gray-300 p-2 sticky left-0 bg-slate-700 text-white z-10 text-sm align-middle whitespace-nowrap"
-                        rowSpan={2}
-                      >
-                        Staff
-                      </th>
-                      <th
-                        className="border border-gray-300 p-1 bg-slate-700 text-white text-sm align-middle"
-                        colSpan={days.length + 5}
+                        className="border border-gray-300 bg-slate-700 text-white text-sm font-semibold text-center"
+                        colSpan={days.length + 6}
+                        style={{ padding: "10px 0" }}
                       >
                         {format(month, "MMMM yyyy")}
                       </th>
                     </tr>
                     <tr>
+                      <th className="border border-gray-300 p-2 sticky left-0 bg-slate-700 text-white z-10 text-sm whitespace-nowrap">
+                        Staff
+                      </th>
                       {days.map((d, idx) => (
                         <th
                           key={idx}
@@ -433,7 +423,7 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
                         <td
                           className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
                           onClick={() => openStatusModal(staff, "full-day")}
-                          title="Click to view Full Day dates"
+                          title="Click to view & adjust Full Day dates"
                         >
                           {staff.fullDays}
                         </td>
@@ -454,7 +444,7 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
                         <td
                           className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
                           onClick={() => openStatusModal(staff, "absent")}
-                          title="Click to view Absent dates"
+                          title="Click to view & adjust Absent dates"
                         >
                           {staff.absents}
                         </td>
