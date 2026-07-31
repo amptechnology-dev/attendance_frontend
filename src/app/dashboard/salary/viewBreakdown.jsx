@@ -269,6 +269,7 @@ export default function ViewButton({
                 <ConditionalRow label="ESI" value={localSalaryStructure?.esi} />
                 <ConditionalRow label="PF" value={localSalaryStructure?.pf} />
                 <ConditionalRow label="Professional Tax" value={localSalaryStructure?.pTax} />
+                <ConditionalRow label="LWF" value={localSalaryStructure?.lwf} />
 
                 {/* Leave deduction always present */}
                 <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">

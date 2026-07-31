@@ -17,6 +17,12 @@ const DEFAULT_STRUCTURE = {
   pf: { enabled: false, calculateOn: "basic", rate: 12, wageCeiling: 15000 },
   esi: { enabled: false, rate: 0.75, wageCeiling: 21000 },
   pTax: { enabled: false },
+  lwf: {
+    enabled: false,
+    calculateOn: "gross",
+    wageCeiling: 15000,
+    fixedAmount: 25,
+  },
   bonus_rate: 8.33,
 };
 
@@ -58,6 +64,8 @@ const NUMERIC_FIELD_PATHS = [
   ["pf", "wageCeiling"],
   ["esi", "rate"],
   ["esi", "wageCeiling"],
+  ["lwf", "wageCeiling"],
+  ["lwf", "fixedAmount"],
   ["bonus_rate", null],
 ];
 
@@ -557,6 +565,59 @@ export default function EditStructure({ data = {} }) {
                 Auto-calculated by slab: ₹0 (&lt;10,000) · ₹110 (&lt;15,001) ·
                 ₹130 (&lt;25,001) · ₹150 (&lt;40,001) · ₹200 (above)
               </p>
+            </Section>
+
+            {/* ---------- LWF ---------- */}
+            <Section
+              title="LWF — Labour Welfare Fund"
+              description="Flat rupee deduction (not a percentage), applicable if the chosen base is within the wage ceiling"
+              toggle
+              checked={form.lwf.enabled}
+              onToggle={(v) => update("lwf", "enabled", v)}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="Depends on" htmlFor="lwfCalcOn">
+                  <Select
+                    id="lwfCalcOn"
+                    value={form.lwf.calculateOn}
+                    onChange={(e) =>
+                      update("lwf", "calculateOn", e.target.value)
+                    }
+                    required
+                  >
+                    <option value="gross">Gross Salary</option>
+                    <option value="basic">Basic</option>
+                    <option value="basicPlusDa">Basic + DA</option>
+                    <option value="actualSalary">Actual Monthly Salary</option>
+                  </Select>
+                </Field>
+                <Field label="Applicable if value ≤ (₹)" htmlFor="lwfCeiling">
+                  <TextInput
+                    id="lwfCeiling"
+                    type="text"
+                    inputMode="decimal"
+                    value={form.lwf.wageCeiling}
+                    onChange={(e) =>
+                      updateNumeric("lwf", "wageCeiling", e.target.value)
+                    }
+                    required
+                  />
+                </Field>
+                <div className="md:col-span-2">
+                  <Field label="Fixed deduction amount (₹)" htmlFor="lwfAmount">
+                    <TextInput
+                      id="lwfAmount"
+                      type="text"
+                      inputMode="decimal"
+                      value={form.lwf.fixedAmount}
+                      onChange={(e) =>
+                        updateNumeric("lwf", "fixedAmount", e.target.value)
+                      }
+                      required
+                    />
+                  </Field>
+                </div>
+              </div>
             </Section>
 
             {/* ---------- BONUS RATE ---------- */}

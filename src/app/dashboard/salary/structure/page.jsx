@@ -30,6 +30,12 @@ const HRA_LABELS = {
   basicPlusDa: "Basic + DA",
 };
 const PF_LABELS = { basic: "Basic", basicPlusDa: "Basic + DA" };
+const LWF_LABELS = {
+  gross: "Gross Salary",
+  basic: "Basic",
+  basicPlusDa: "Basic + DA",
+  actualSalary: "Actual Monthly Salary",
+};
 
 export default async function SalaryStructure() {
   const fetchSalaryStructure = await fetchWithCookies(
@@ -115,7 +121,7 @@ export default async function SalaryStructure() {
             </TableCell>
             <TableCell>
               {s?.specialAllowance?.enabled
-                ? "Auto: Gross − Basic − DA − HRA − Conveyance"
+                ? "Auto: Gross − Basic − DA − HRA"
                 : "—"}
             </TableCell>
           </TableRow>
@@ -149,7 +155,7 @@ export default async function SalaryStructure() {
             </TableCell>
             <TableCell>
               {s?.esi?.enabled
-                ? `${s.esi.rate}% (if Gross ≤ ₹${s.esi.wageCeiling})`
+                ? `${s.esi.rate}% (if Actual Salary ≤ ₹${s.esi.wageCeiling})`
                 : "—"}
             </TableCell>
           </TableRow>
@@ -159,6 +165,17 @@ export default async function SalaryStructure() {
               PTax <StatusBadge enabled={s?.pTax?.enabled} />
             </TableCell>
             <TableCell>{s?.pTax?.enabled ? "Slab-based" : "—"}</TableCell>
+          </TableRow>
+
+          <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
+            <TableCell className="flex items-center gap-2">
+              LWF <StatusBadge enabled={s?.lwf?.enabled} />
+            </TableCell>
+            <TableCell>
+              {s?.lwf?.enabled
+                ? `₹${s.lwf.fixedAmount} if ${LWF_LABELS[s.lwf.calculateOn]} ≤ ₹${s.lwf.wageCeiling}`
+                : "—"}
+            </TableCell>
           </TableRow>
 
           <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
