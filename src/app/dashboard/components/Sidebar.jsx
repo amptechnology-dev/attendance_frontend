@@ -195,6 +195,7 @@ export function AdminSidebar() {
               </NavItem>
             )}
           </Sidebar.Collapse>
+          
 
           {hasPermission(user, permissions.VIEW_STAFFS) && (
             <NavItem
@@ -291,6 +292,14 @@ export function AdminSidebar() {
                 active={isActive("/dashboard/salary/pay-slip")}
               >
                 Pay Slip
+              </NavItem>
+
+              <NavItem
+                href="/dashboard/salary/salary-register"
+                icon={TbReport}
+                active={isActive("/dashboard/salary/salary-register")}
+              >
+                Salary Register
               </NavItem>
             </Sidebar.Collapse>
           )}

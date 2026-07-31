@@ -11,7 +11,7 @@ export const metadata = {
 
 export default async function Page() {
   const fetchAllSalary = await fetchWithCookies(
-    `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/get/past-months?months=3`
+    `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/get/past-months?months=3`,
   ).catch((error) => {
     if (error.message === "Unauthorized") {
       redirect("/auth/admin");
@@ -19,7 +19,15 @@ export default async function Page() {
     console.log(error);
   });
   const fetchPreviousMonthSalary = await fetchWithCookies(
-    `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/get/previous-month`
+    `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/get/previous-month`,
+  ).catch((error) => {
+    if (error.message === "Unauthorized") {
+      redirect("/auth/admin");
+    }
+    console.log(error);
+  });
+  const fetchSalaryStructure = await fetchWithCookies(
+    `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/structure/get`,
   ).catch((error) => {
     if (error.message === "Unauthorized") {
       redirect("/auth/admin");
@@ -29,6 +37,7 @@ export default async function Page() {
 
   const allSalaryData = fetchAllSalary?.data;
   const previousMonthSalary = fetchPreviousMonthSalary?.data;
+  const officeSalaryStructure = fetchSalaryStructure?.data;
 
   return (
     <div>
@@ -38,6 +47,7 @@ export default async function Page() {
       <TabsWithDatatable
         allSalaryData={allSalaryData}
         previousMonthSalary={previousMonthSalary}
+        officeSalaryStructure={officeSalaryStructure}
       />
     </div>
   );

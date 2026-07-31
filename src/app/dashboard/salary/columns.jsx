@@ -3,7 +3,12 @@ import { format } from "date-fns";
 import ViewBreakdown from "./viewBreakdown";
 import ViewPresentLog from "./viewPresent";
 
-export const columns = [
+// Changed from a static `export const columns = [...]` array to a
+// function that accepts the office-wide SalaryStructure, because the
+// "Manage" column's ViewBreakdown needs conveyanceSettings (office-wide
+// config) to decide whether to show the edit-pen icon — that data isn't
+// available at module-load time, only after the page fetches it.
+export const getColumns = (officeSalaryStructure) => [
   {
     accessorKey: "month",
     header: "Month",
@@ -39,22 +44,6 @@ export const columns = [
     header: "Net Salary",
     cell: (info) => info.getValue(),
   },
-  //   {
-  //     accessorKey: "breakTime",
-  //     header: "Break Time",
-  //     cell: (info) => {
-  //       const totalMinutes = info.getValue();
-  //       if (totalMinutes <= 0) return "-";
-  //       const hours = Math.floor(totalMinutes / 60);
-  //       const minutes = totalMinutes % 60;
-  //       return `${hours}h ${minutes}m`;
-  //     },
-  //   },
-  // {
-  //   accessorKey: "status",
-  //   header: "Status",
-  //   cell: (info) => info.getValue(),
-  // },
   {
     accessorKey: "updatedAt",
     header: "Updated",
@@ -67,12 +56,14 @@ export const columns = [
     cell: (info) => (
       <div className="flex gap-2">
         <ViewBreakdown
+          salaryId={info.row.original._id}
           name={info.row.original.staff?.fullName}
           month={info.row.original.month + " - " + info.row.original.year}
           salaryStructure={{
             ...info.row.original.breakdown,
             ...info.row.original.leaves,
           }}
+          conveyanceSettings={officeSalaryStructure?.conveyance}
           presentLogs={info.row.original.attendanceDetails}
         />
         <ViewPresentLog

@@ -4,182 +4,586 @@ import { Button, Label, Modal, TextInput, Select } from "flowbite-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "react-toastify";
+import { RiSettings4Line } from "react-icons/ri";
 
-export default function Component({ data = {} }) {
+const DEFAULT_STRUCTURE = {
+  grossSalary: { calculationType: "fixed" },
+  basicSalary: { calculationType: "fixed", percentage: 50 },
+  da: { enabled: false, percentage: 0 },
+  otherAllowance: { enabled: false, percentage: 0 },
+  hra: { enabled: false, calculateOn: "basic", percentage: 0 },
+  conveyance: { enabled: false, mode: "input", percentage: 0 },
+  specialAllowance: { enabled: false },
+  pf: { enabled: false, calculateOn: "basic", rate: 12, wageCeiling: 15000 },
+  esi: { enabled: false, rate: 0.75, wageCeiling: 21000 },
+  pTax: { enabled: false },
+  bonus_rate: 8.33,
+};
+
+// Merge saved data over defaults so missing keys (new fields, old records) never crash the form
+function mergeWithDefaults(data = {}) {
+  const merged = structuredClone(DEFAULT_STRUCTURE);
+  for (const key of Object.keys(merged)) {
+    if (data[key] && typeof merged[key] === "object") {
+      merged[key] = { ...merged[key], ...data[key] };
+    } else if (data[key] !== undefined) {
+      merged[key] = data[key];
+    }
+  }
+  return merged;
+}
+
+function notify(type, message) {
+  toast[type](message, {
+    position: "bottom-right",
+    hideProgressBar: false,
+    closeOnClick: true,
+    pauseOnHover: true,
+    draggable: true,
+  });
+}
+
+// ================================================================
+// NUMERIC FIELD PATHS — every field that must be coerced to a Number
+// right before submit (kept as raw string in state while editing, so
+// clearing/retyping doesn't fight React's controlled-input re-render).
+// ================================================================
+const NUMERIC_FIELD_PATHS = [
+  ["basicSalary", "percentage"],
+  ["da", "percentage"],
+  ["otherAllowance", "percentage"],
+  ["hra", "percentage"],
+  ["conveyance", "percentage"],
+  ["pf", "rate"],
+  ["pf", "wageCeiling"],
+  ["esi", "rate"],
+  ["esi", "wageCeiling"],
+  ["bonus_rate", null],
+];
+
+// Converts all numeric-looking string fields to actual Numbers right
+// before sending to the API. Empty string -> 0 (safe default).
+function sanitizeNumbersForSubmit(form) {
+  const sanitized = structuredClone(form);
+  NUMERIC_FIELD_PATHS.forEach(([section, field]) => {
+    if (field === null) {
+      sanitized[section] = Number(sanitized[section]) || 0;
+    } else {
+      sanitized[section][field] = Number(sanitized[section][field]) || 0;
+    }
+  });
+  return sanitized;
+}
+
+// Calculates Special Allowance as remaining % after Basic, DA, HRA, Other
+// Allowance (all normalized to % of Gross, since calculateOn bases differ).
+// NOTE: Conveyance is intentionally NOT subtracted here anymore — it's
+// independent of Special Allowance's split (matches the backend formula:
+// Special = Gross - Basic - DA - HRA - OtherAllowance, no conveyance term).
+function computeSpecialAllowancePercent(form) {
+  const basicPct = Number(form.basicSalary.percentage) || 0;
+
+  const daPct = form.da.enabled
+    ? (Number(form.da.percentage) || 0) * (basicPct / 100)
+    : 0;
+
+  let hraBasePct = 0;
+  if (form.hra.calculateOn === "basic") hraBasePct = basicPct;
+  else if (form.hra.calculateOn === "gross") hraBasePct = 100;
+  else if (form.hra.calculateOn === "basicPlusDa")
+    hraBasePct = basicPct + daPct;
+
+  const hraPct = form.hra.enabled
+    ? (Number(form.hra.percentage) || 0) * (hraBasePct / 100)
+    : 0;
+
+  // Special = Gross - Basic - DA - HRA (Other Allowance এখানে subtract হয় না)
+  const specialPct = 100 - basicPct - daPct - hraPct;
+  return {
+    basicPct,
+    daPct,
+    hraPct,
+    specialPct: Math.max(specialPct, 0),
+  };
+}
+
+// Reusable section wrapper — header row with title + checkbox, and a
+// subtle left-border accent that lights up when the section is enabled.
+// Pass `toggle={null}` for sections that are always active (no enable/disable).
+function Section({ title, description, toggle, checked, onToggle, children }) {
+  const isToggleable = toggle !== null;
+  const isActive = isToggleable ? checked : true;
+
+  return (
+    <div
+      className={`rounded-lg border transition-colors ${
+        isActive
+          ? "border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800"
+          : "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/40"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-4 px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+            {title}
+          </h3>
+          {description && (
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              {description}
+            </p>
+          )}
+        </div>
+
+        {isToggleable && (
+          <label className="flex items-center gap-2 shrink-0 cursor-pointer select-none pt-0.5">
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={(e) => onToggle(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+            />
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+              Enabled
+            </span>
+          </label>
+        )}
+      </div>
+
+      {isActive && children && <div className="px-4 py-3">{children}</div>}
+    </div>
+  );
+}
+
+function Field({ label, htmlFor, children }) {
+  return (
+    <div>
+      <Label
+        htmlFor={htmlFor}
+        value={label}
+        className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300"
+      />
+      {children}
+    </div>
+  );
+}
+
+export default function EditStructure({ data = {} }) {
   const [openModal, setOpenModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState(() => mergeWithDefaults(data));
   const router = useRouter();
 
   function onCloseModal() {
     setOpenModal(false);
+    setForm(mergeWithDefaults(data)); // reset unsaved edits on close
+  }
+
+  // Generic setter for nested fields: update("hra", "percentage", 10)
+  function update(section, field, value) {
+    setForm((prev) => ({
+      ...prev,
+      [section]: field === null ? value : { ...prev[section], [field]: value },
+    }));
+  }
+
+  // ================================================================
+  // Numeric input handler — keeps the RAW STRING in state instead of
+  // immediately coercing with Number(). This is the actual fix:
+  // Number("") === 0 was forcing the field back to "0" on every
+  // backspace, which fought React's controlled-input re-render and
+  // made it impossible to clear + retype a different value smoothly.
+  // Conversion to a real Number only happens right before submit
+  // (see sanitizeNumbersForSubmit).
+  // ================================================================
+  function updateNumeric(section, field, rawValue) {
+    // Allow empty string (mid-edit) and reject non-numeric junk chars,
+    // but otherwise keep exactly what the user typed (including "0",
+    // "1.", trailing decimals, etc.) so typing never gets fought.
+    if (rawValue !== "" && !/^\d*\.?\d*$/.test(rawValue)) return;
+    update(section, field, rawValue);
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const formData = new FormData(e.target);
-
+    setSubmitting(true);
     try {
+      const payload = sanitizeNumbersForSubmit(form);
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/structure/update`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(Object.fromEntries(formData)),
+          body: JSON.stringify(payload),
           credentials: "include",
-        }
+        },
       );
 
       if (response.ok) {
-        toast.success("Salary Structure updated successfully!", {
-          position: "bottom-right",
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-        });
-        e.target.reset();
+        notify("success", "Salary Structure updated successfully!");
         setOpenModal(false);
         router.refresh();
       } else {
         const error = await response.json();
-        error.errors?.forEach((error) => {
-          toast.error(error.message, {
-            position: "bottom-right",
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-          });
-        });
+        if (error.errors?.length) {
+          error.errors.forEach((err) => notify("error", err.message));
+        } else {
+          notify("error", error.message || "Something went wrong.");
+        }
       }
     } catch (error) {
-      toast.error(error.message, {
-        position: "bottom-right",
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
+      notify("error", error.message);
+    } finally {
+      setSubmitting(false);
     }
   }
 
   return (
     <>
-      <Button color="info" onClick={() => [setOpenModal(true)]}>
-        Edit
+      <Button color="info" onClick={() => setOpenModal(true)}>
+        <RiSettings4Line className="mr-2 h-4 w-4" />
+        Edit Structure
       </Button>
 
-      <Modal show={openModal} size="xl" onClose={onCloseModal}>
-        <Modal.Header> Edit Salary Structure </Modal.Header>
-        <Modal.Body>
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <div className="mb-2 block">
-                  <Label htmlFor="basic" value="Basic Salary (%)" />
-                </div>
-                <TextInput
-                  id="basic"
-                  type="number"
-                  name="basic_percentage"
-                  defaultValue={data.basic_percentage}
-                  min={0}
-                  max={100}
+      <Modal show={openModal} size="2xl" onClose={onCloseModal}>
+        <Modal.Header>
+          <span className="text-base font-semibold">Salary Structure</span>
+        </Modal.Header>
+
+        <Modal.Body className="bg-gray-50 dark:bg-gray-900">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* ---------- GROSS SALARY ---------- */}
+            <Section
+              title="Gross Salary"
+              description="How the total payable amount is determined"
+              toggle={null}
+            >
+              <Field label="Calculation method" htmlFor="grossCalcType">
+                <Select
+                  id="grossCalcType"
+                  value={form.grossSalary.calculationType}
+                  onChange={(e) =>
+                    update("grossSalary", "calculationType", e.target.value)
+                  }
                   required
-                />
-              </div>
-              <div>
-                <div className="mb-2 block">
-                  <Label htmlFor="hra" value="HRA (%)" />
-                </div>
-                <TextInput
-                  id="hra"
-                  type="number"
-                  name="hra_allowance_percentage"
-                  defaultValue={data.hra_allowance_percentage}
-                  min={0}
-                  max={100}
-                  required
-                />
-              </div>
-              <div>
-                <div className="mb-2 block">
-                  <Label
-                    htmlFor="conveyance"
-                    value="Conveyance Allowance (%)"
+                >
+                  <option value="fixed">Fixed monthly salary</option>
+                  <option value="perDay">
+                    No. of days × rate (prorated by attendance)
+                  </option>
+                </Select>
+              </Field>
+            </Section>
+
+            {/* ---------- BASIC SALARY ---------- */}
+            <Section
+              title="Basic Salary"
+              description="Base component used to calculate other allowances"
+              toggle={null}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="Calculation method" htmlFor="basicCalcType">
+                  <Select
+                    id="basicCalcType"
+                    value={form.basicSalary.calculationType}
+                    onChange={(e) =>
+                      update("basicSalary", "calculationType", e.target.value)
+                    }
+                    required
+                  >
+                    <option value="fixed">Percentage of gross salary</option>
+                    <option value="perDay">Working days × per-day rate</option>
+                  </Select>
+                </Field>
+                <Field label="Basic salary (%)" htmlFor="basicPct">
+                  <TextInput
+                    id="basicPct"
+                    type="text"
+                    inputMode="decimal"
+                    value={form.basicSalary.percentage}
+                    onChange={(e) =>
+                      updateNumeric("basicSalary", "percentage", e.target.value)
+                    }
+                    required
                   />
-                </div>
+                </Field>
+              </div>
+            </Section>
+
+            {/* ---------- DA ---------- */}
+            <Section
+              title="DA — Dearness Allowance"
+              description="Cost-of-living adjustment on top of basic salary"
+              toggle
+              checked={form.da.enabled}
+              onToggle={(v) => update("da", "enabled", v)}
+            >
+              <Field label="DA (% of basic)" htmlFor="daPct">
                 <TextInput
-                  id="conveyance"
-                  type="number"
-                  name="conveyance_allowance_percentage"
-                  defaultValue={data.conveyance_allowance_percentage}
-                  min={0}
-                  max={100}
+                  id="daPct"
+                  type="text"
+                  inputMode="decimal"
+                  value={form.da.percentage}
+                  onChange={(e) =>
+                    updateNumeric("da", "percentage", e.target.value)
+                  }
                   required
                 />
+              </Field>
+            </Section>
+
+            {/* ---------- HRA ---------- */}
+            <Section
+              title="HRA — House Rent Allowance"
+              toggle
+              checked={form.hra.enabled}
+              onToggle={(v) => update("hra", "enabled", v)}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="Calculate on" htmlFor="hraCalcOn">
+                  <Select
+                    id="hraCalcOn"
+                    value={form.hra.calculateOn}
+                    onChange={(e) =>
+                      update("hra", "calculateOn", e.target.value)
+                    }
+                    required
+                  >
+                    <option value="basic">Basic</option>
+                    <option value="gross">Gross salary</option>
+                    <option value="basicPlusDa">Basic + DA</option>
+                  </Select>
+                </Field>
+                <Field label="HRA (%)" htmlFor="hraPct">
+                  <TextInput
+                    id="hraPct"
+                    type="text"
+                    inputMode="decimal"
+                    value={form.hra.percentage}
+                    onChange={(e) =>
+                      updateNumeric("hra", "percentage", e.target.value)
+                    }
+                    required
+                  />
+                </Field>
               </div>
-              <div>
-                <div className="mb-2 block">
-                  <Label htmlFor="special" value="Special Allowance (%)" />
-                </div>
+            </Section>
+
+            {/* ---------- SPECIAL ALLOWANCE ---------- */}
+            <Section
+              title="Special Allowance"
+              toggle
+              checked={form.specialAllowance.enabled}
+              onToggle={(v) => update("specialAllowance", "enabled", v)}
+            >
+              {(() => {
+                const { specialPct } = computeSpecialAllowancePercent(form);
+                return (
+                  <div className="space-y-2">
+                    <p className="rounded-md bg-gray-100 dark:bg-gray-700 px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
+                      Auto-calculated: Gross − Basic − DA − HRA
+                    </p>
+                    <div className="rounded-md border border-dashed border-gray-300 dark:border-gray-600 px-3 py-2 text-xs text-gray-600 dark:text-gray-300"></div>
+                  </div>
+                );
+              })()}
+            </Section>
+
+            {/* ---------- CONVEYANCE ---------- */}
+            <Section
+              title="Conveyance Allowance"
+              description="Independent of Special Allowance — does not affect its split"
+              toggle
+              checked={form.conveyance.enabled}
+              onToggle={(v) => update("conveyance", "enabled", v)}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="Mode" htmlFor="conveyanceMode">
+                  <Select
+                    id="conveyanceMode"
+                    value={form.conveyance.mode}
+                    onChange={(e) =>
+                      update("conveyance", "mode", e.target.value)
+                    }
+                    required
+                  >
+                    <option value="input">Manual amount per staff</option>
+                    <option value="readonly">Auto — % of gross</option>
+                  </Select>
+                </Field>
+                {form.conveyance.mode === "readonly" && (
+                  <Field label="Conveyance (%)" htmlFor="conveyancePct">
+                    <TextInput
+                      id="conveyancePct"
+                      type="text"
+                      inputMode="decimal"
+                      value={form.conveyance.percentage}
+                      onChange={(e) =>
+                        updateNumeric(
+                          "conveyance",
+                          "percentage",
+                          e.target.value,
+                        )
+                      }
+                      required
+                    />
+                  </Field>
+                )}
+              </div>
+            </Section>
+
+            {/* ---------- OTHER ALLOWANCE ---------- */}
+            <Section
+              title="Other Allowance"
+              description="Additional allowance on top of basic salary"
+              toggle
+              checked={form.otherAllowance.enabled}
+              onToggle={(v) => update("otherAllowance", "enabled", v)}
+            >
+              <Field
+                label="Other Allowance (% of basic)"
+                htmlFor="otherAllowancePct"
+              >
                 <TextInput
-                  id="special"
-                  type="number"
-                  name="special_allowance_percentage"
-                  defaultValue={data.special_allowance_percentage}
-                  min={0}
-                  max={100}
+                  id="otherAllowancePct"
+                  type="text"
+                  inputMode="decimal"
+                  value={form.otherAllowance.percentage}
+                  onChange={(e) =>
+                    updateNumeric(
+                      "otherAllowance",
+                      "percentage",
+                      e.target.value,
+                    )
+                  }
                   required
                 />
-              </div>
-              <div>
-                <div className="mb-2 block">
-                  <Label htmlFor="other" value="Other Allowance (%)" />
+              </Field>
+            </Section>
+
+            {/* ---------- PF ---------- */}
+            <Section
+              title="PF — Provident Fund"
+              toggle
+              checked={form.pf.enabled}
+              onToggle={(v) => update("pf", "enabled", v)}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="Calculate on" htmlFor="pfCalcOn">
+                  <Select
+                    id="pfCalcOn"
+                    value={form.pf.calculateOn}
+                    onChange={(e) =>
+                      update("pf", "calculateOn", e.target.value)
+                    }
+                    required
+                  >
+                    <option value="basic">Basic</option>
+                    <option value="basicPlusDa">Basic + DA</option>
+                  </Select>
+                </Field>
+                <Field label="PF rate (%)" htmlFor="pfRate">
+                  <TextInput
+                    id="pfRate"
+                    type="text"
+                    inputMode="decimal"
+                    value={form.pf.rate}
+                    onChange={(e) =>
+                      updateNumeric("pf", "rate", e.target.value)
+                    }
+                    required
+                  />
+                </Field>
+                <div className="md:col-span-2">
+                  <Field label="Wage ceiling (₹)" htmlFor="pfCeiling">
+                    <TextInput
+                      id="pfCeiling"
+                      type="text"
+                      inputMode="decimal"
+                      value={form.pf.wageCeiling}
+                      onChange={(e) =>
+                        updateNumeric("pf", "wageCeiling", e.target.value)
+                      }
+                      required
+                    />
+                  </Field>
                 </div>
+              </div>
+            </Section>
+
+            {/* ---------- ESI ---------- */}
+            <Section
+              title="ESI"
+              toggle
+              checked={form.esi.enabled}
+              onToggle={(v) => update("esi", "enabled", v)}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="ESI rate (%)" htmlFor="esiRate">
+                  <TextInput
+                    id="esiRate"
+                    type="text"
+                    inputMode="decimal"
+                    value={form.esi.rate}
+                    onChange={(e) =>
+                      updateNumeric("esi", "rate", e.target.value)
+                    }
+                    required
+                  />
+                </Field>
+                <Field label="Applicable if salary ≤ (₹)" htmlFor="esiCeiling">
+                  <TextInput
+                    id="esiCeiling"
+                    type="text"
+                    inputMode="decimal"
+                    value={form.esi.wageCeiling}
+                    onChange={(e) =>
+                      updateNumeric("esi", "wageCeiling", e.target.value)
+                    }
+                    required
+                  />
+                </Field>
+              </div>
+            </Section>
+
+            {/* ---------- PTAX ---------- */}
+            <Section
+              title="Professional Tax (PTax)"
+              toggle
+              checked={form.pTax.enabled}
+              onToggle={(v) => update("pTax", "enabled", v)}
+            >
+              <p className="rounded-md bg-gray-100 dark:bg-gray-700 px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
+                Auto-calculated by slab: ₹0 (&lt;10,000) · ₹110 (&lt;15,001) ·
+                ₹130 (&lt;25,001) · ₹150 (&lt;40,001) · ₹200 (above)
+              </p>
+            </Section>
+
+            {/* ---------- BONUS RATE ---------- */}
+            <Section title="Bonus Rate" toggle={null}>
+              <Field label="Bonus rate (%)" htmlFor="bonusRate">
                 <TextInput
-                  id="other"
-                  type="number"
-                  name="other_allowance_percentage"
-                  defaultValue={data.other_allowance_percentage}
-                  min={0}
-                  max={100}
+                  id="bonusRate"
+                  type="text"
+                  inputMode="decimal"
+                  value={form.bonus_rate}
+                  onChange={(e) =>
+                    updateNumeric("bonus_rate", null, e.target.value)
+                  }
                   required
                 />
-              </div>
-              <div></div>
-              <div>
-                <div className="mb-2 block">
-                  <Label htmlFor="esi" value="ESI (%)" />
-                </div>
-                <TextInput
-                  id="esi"
-                  type="number"
-                  name="esi_rate"
-                  defaultValue={data.esi_rate}
-                  min={0}
-                  max={100}
-                  required
-                />
-              </div>
-              <div>
-                <div className="mb-2 block">
-                  <Label htmlFor="pf" value="PF (%)" />
-                </div>
-                <TextInput
-                  id="pf"
-                  type="number"
-                  name="pf_rate"
-                  defaultValue={data.pf_rate}
-                  min={0}
-                  max={100}
-                  required
-                />
-              </div>
-              <div className="md:col-span-2 flex justify-center">
-                <Button type="submit" color="success" className="w-full">
-                  Submit
-                </Button>
-              </div>
+              </Field>
+            </Section>
+
+            <div className="sticky bottom-0 -mx-6 -mb-6 border-t border-gray-200 bg-white px-6 py-3 dark:border-gray-700 dark:bg-gray-800">
+              <Button
+                type="submit"
+                color="success"
+                className="w-full"
+                disabled={submitting}
+              >
+                {submitting ? "Saving…" : "Save changes"}
+              </Button>
             </div>
           </form>
         </Modal.Body>

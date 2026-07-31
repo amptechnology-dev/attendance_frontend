@@ -19,7 +19,7 @@ export default function CalculateSalaryButton() {
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URI}/admin/month/get`,
-        { cache: "no-store", credentials: "include" }
+        { cache: "no-store", credentials: "include" },
       );
       const data = await response?.json();
       if (response.ok) {
@@ -51,7 +51,7 @@ export default function CalculateSalaryButton() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(Object.fromEntries(formData)),
           credentials: "include",
-        }
+        },
       );
 
       const result = await response.json();
@@ -63,7 +63,9 @@ export default function CalculateSalaryButton() {
         setIsOpen(false);
         router.refresh();
       } else {
-        toast.error(result.message || "Failed to calculate salary.", {
+        const errorMessage = result.errors?.replace(/^Error:\s*/, "");
+
+        toast.error(errorMessage || "Failed to calculate salary.", {
           position: "bottom-right",
         });
       }

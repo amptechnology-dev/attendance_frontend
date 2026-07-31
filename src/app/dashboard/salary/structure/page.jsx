@@ -5,7 +5,9 @@ import {
   TableBody,
   TableRow,
   TableCell,
+  Badge,
 } from "flowbite-react";
+import { redirect } from "next/navigation";
 import { fetchWithCookies } from "@/lib/fetchWithCookies";
 import EditButton from "./editStructure";
 
@@ -14,9 +16,24 @@ export const metadata = {
   description: "",
 };
 
+function StatusBadge({ enabled }) {
+  return (
+    <Badge color={enabled ? "success" : "gray"}>
+      {enabled ? "Enabled" : "Disabled"}
+    </Badge>
+  );
+}
+
+const HRA_LABELS = {
+  basic: "Basic",
+  gross: "Gross Salary",
+  basicPlusDa: "Basic + DA",
+};
+const PF_LABELS = { basic: "Basic", basicPlusDa: "Basic + DA" };
+
 export default async function SalaryStructure() {
   const fetchSalaryStructure = await fetchWithCookies(
-    `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/structure/get`
+    `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/structure/get`,
   ).catch((error) => {
     if (error.message === "Unauthorized") {
       redirect("/auth/admin");
@@ -24,53 +41,129 @@ export default async function SalaryStructure() {
     console.log(error);
   });
 
-  const salaryStructure = fetchSalaryStructure?.data;
+  const s = fetchSalaryStructure?.data;
 
   return (
-    <div className="p-2 max-w-lg">
+    <div className="p-2 max-w-2xl">
       <div className="flex justify-between mb-3">
         <h1 className="text-2xl">Salary Structure</h1>
-        <EditButton data={salaryStructure} />
+        <EditButton data={s} />
       </div>
+
       <Table striped>
         <TableHead>
-          <TableHeadCell>Label</TableHeadCell>
-          <TableHeadCell>Rate</TableHeadCell>
+          <TableHeadCell>Component</TableHeadCell>
+          <TableHeadCell>Configuration</TableHeadCell>
         </TableHead>
         <TableBody className="divide-y">
           <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
-            <TableCell className="flex gap-2">Basic Salary</TableCell>
-            <TableCell>{salaryStructure?.basic_percentage}%</TableCell>
-          </TableRow>
-          <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
-            <TableCell className="flex gap-2">House Rent Allowance</TableCell>
-            <TableCell>{salaryStructure?.hra_allowance_percentage}%</TableCell>
-          </TableRow>
-          <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
-            <TableCell className="flex gap-2">Conveyance Allowance</TableCell>
+            <TableCell>Gross Salary</TableCell>
             <TableCell>
-              {salaryStructure?.conveyance_allowance_percentage}%
+              {s?.grossSalary?.calculationType === "perDay"
+                ? "No. of Days × Rate"
+                : "Fixed Monthly Salary"}
             </TableCell>
           </TableRow>
+
           <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
-            <TableCell className="flex gap-2">Special Allowance</TableCell>
+            <TableCell>Basic Salary</TableCell>
             <TableCell>
-              {salaryStructure?.special_allowance_percentage}%
+              {s?.basicSalary?.percentage}% —{" "}
+              {s?.basicSalary?.calculationType === "perDay"
+                ? "Working Days × Per-Day Rate"
+                : "% of Gross"}
             </TableCell>
           </TableRow>
+
           <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
-            <TableCell className="flex gap-2">Others Allowance</TableCell>
+            <TableCell className="flex items-center gap-2">
+              DA <StatusBadge enabled={s?.da?.enabled} />
+            </TableCell>
             <TableCell>
-              {salaryStructure?.other_allowance_percentage}%
+              {s?.da?.enabled ? `${s.da.percentage}% of Basic` : "—"}
             </TableCell>
           </TableRow>
+
           <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
-            <TableCell className="flex gap-2">ESI</TableCell>
-            <TableCell>{salaryStructure?.esi_rate}%</TableCell>
+            <TableCell className="flex items-center gap-2">
+              HRA <StatusBadge enabled={s?.hra?.enabled} />
+            </TableCell>
+            <TableCell>
+              {s?.hra?.enabled
+                ? `${s.hra.percentage}% of ${HRA_LABELS[s.hra.calculateOn]}`
+                : "—"}
+            </TableCell>
           </TableRow>
+
           <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
-            <TableCell className="flex gap-2">PF</TableCell>
-            <TableCell>{salaryStructure?.pf_rate}%</TableCell>
+            <TableCell className="flex items-center gap-2">
+              Conveyance <StatusBadge enabled={s?.conveyance?.enabled} />
+            </TableCell>
+            <TableCell>
+              {s?.conveyance?.enabled
+                ? s.conveyance.mode === "readonly"
+                  ? `${s.conveyance.percentage}% of Gross (Auto)`
+                  : "Manual amount per staff"
+                : "—"}
+            </TableCell>
+          </TableRow>
+
+          <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
+            <TableCell className="flex items-center gap-2">
+              Special Allowance{" "}
+              <StatusBadge enabled={s?.specialAllowance?.enabled} />
+            </TableCell>
+            <TableCell>
+              {s?.specialAllowance?.enabled
+                ? "Auto: Gross − Basic − DA − HRA − Conveyance"
+                : "—"}
+            </TableCell>
+          </TableRow>
+
+          <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
+            <TableCell className="flex items-center gap-2">
+              Other Allowances{" "}
+              <StatusBadge enabled={s?.otherAllowance?.enabled} />
+            </TableCell>
+            <TableCell>
+              {s?.otherAllowance?.enabled
+                ? `${s.otherAllowance.percentage}% of Basic`
+                : "—"}
+            </TableCell>
+          </TableRow>
+
+          <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
+            <TableCell className="flex items-center gap-2">
+              PF <StatusBadge enabled={s?.pf?.enabled} />
+            </TableCell>
+            <TableCell>
+              {s?.pf?.enabled
+                ? `${s.pf.rate}% of ${PF_LABELS[s.pf.calculateOn]} (capped at ₹${s.pf.wageCeiling})`
+                : "—"}
+            </TableCell>
+          </TableRow>
+
+          <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
+            <TableCell className="flex items-center gap-2">
+              ESI <StatusBadge enabled={s?.esi?.enabled} />
+            </TableCell>
+            <TableCell>
+              {s?.esi?.enabled
+                ? `${s.esi.rate}% (if Gross ≤ ₹${s.esi.wageCeiling})`
+                : "—"}
+            </TableCell>
+          </TableRow>
+
+          <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
+            <TableCell className="flex items-center gap-2">
+              PTax <StatusBadge enabled={s?.pTax?.enabled} />
+            </TableCell>
+            <TableCell>{s?.pTax?.enabled ? "Slab-based" : "—"}</TableCell>
+          </TableRow>
+
+          <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
+            <TableCell>Bonus Rate</TableCell>
+            <TableCell>{s?.bonus_rate}%</TableCell>
           </TableRow>
         </TableBody>
       </Table>
