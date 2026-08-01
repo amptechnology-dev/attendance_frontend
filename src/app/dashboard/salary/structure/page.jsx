@@ -75,9 +75,9 @@ export default async function SalaryStructure() {
             <TableCell>Basic Salary</TableCell>
             <TableCell>
               {s?.basicSalary?.percentage}% —{" "}
-              {s?.basicSalary?.calculationType === "perDay"
-                ? "Working Days × Per-Day Rate"
-                : "% of Gross"}
+              {s?.basicSalary?.calculationType === "onTotalSalary"
+                ? "On Total Salary (attendance-prorated)"
+                : "On Gross Salary"}
             </TableCell>
           </TableRow>
 

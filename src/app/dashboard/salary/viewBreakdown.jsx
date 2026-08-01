@@ -1,8 +1,49 @@
 "use client";
 
-import { Button, Modal, Table, Tooltip, TextInput, Spinner } from "flowbite-react";
+import {
+  Button,
+  Modal,
+  Table,
+  Tooltip,
+  TextInput,
+  Spinner,
+} from "flowbite-react";
 import { useState, useEffect } from "react";
-import { RiFileList3Line, RiPencilLine, RiCheckLine, RiCloseLine } from "react-icons/ri";
+import {
+  RiFileList3Line,
+  RiPencilLine,
+  RiCheckLine,
+  RiCloseLine,
+} from "react-icons/ri";
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+// Converts a "6 - 2026" style string (or a raw month number + year) into
+// "June - 2026". Falls back to the original string if parsing fails,
+// so this never crashes on unexpected formats.
+function formatMonthDisplay(month) {
+  const match = String(month).match(/^(\d{1,2})\s*-\s*(\d{4})$/);
+  if (!match) return month;
+
+  const monthNum = Number(match[1]);
+  const year = match[2];
+  const monthName = MONTH_NAMES[monthNum - 1];
+
+  return monthName ? `${monthName} - ${year}` : month;
+}
 
 function ConditionalRow({ label, value, extra = null }) {
   if (value === undefined || value === null) return null;
@@ -53,7 +94,7 @@ function EditableConveyanceRow({ salaryId, value, canEdit, onUpdated }) {
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ amount }),
-        }
+        },
       );
 
       const data = await res.json();
@@ -113,7 +154,11 @@ function EditableConveyanceRow({ salaryId, value, canEdit, onUpdated }) {
                 className="text-green-600 hover:text-green-800"
                 title="Save"
               >
-                {saving ? <Spinner size="sm" /> : <RiCheckLine className="w-5 h-5" />}
+                {saving ? (
+                  <Spinner size="sm" />
+                ) : (
+                  <RiCheckLine className="w-5 h-5" />
+                )}
               </button>
               <button
                 type="button"
@@ -125,7 +170,9 @@ function EditableConveyanceRow({ salaryId, value, canEdit, onUpdated }) {
                 <RiCloseLine className="w-5 h-5" />
               </button>
             </div>
-            {error && <p className="text-xs text-red-500 max-w-[160px]">{error}</p>}
+            {error && (
+              <p className="text-xs text-red-500 max-w-[160px]">{error}</p>
+            )}
           </div>
         ) : (
           Math.round(value)
@@ -136,16 +183,18 @@ function EditableConveyanceRow({ salaryId, value, canEdit, onUpdated }) {
 }
 
 export default function ViewButton({
-  salaryId = "",          // Salary document _id — required for the conveyance update API
+  salaryId = "", // Salary document _id — required for the conveyance update API
   name = "",
-  month = "",             // display string, e.g. "6 - 2026"
-  salaryStructure = {},   // per-staff breakdown + leaves (existing usage, unchanged)
+  month = "", // display string, e.g. "6 - 2026" — rendered as "June - 2026"
+  salaryStructure = {}, // per-staff breakdown + leaves (existing usage, unchanged)
   conveyanceSettings = {}, // office-wide SalaryStructure.conveyance config: { enabled, mode, percentage }
   presentLogs = {},
 }) {
   const [openModal, setOpenModal] = useState(false);
   const [dutyTiming, setDutyTiming] = useState(null);
-  const [localSalaryStructure, setLocalSalaryStructure] = useState(salaryStructure);
+  const [dutyTimingLoaded, setDutyTimingLoaded] = useState(false);
+  const [localSalaryStructure, setLocalSalaryStructure] =
+    useState(salaryStructure);
 
   useEffect(() => {
     setLocalSalaryStructure(salaryStructure);
@@ -161,17 +210,21 @@ export default function ViewButton({
               method: "GET",
               credentials: "include",
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
 
           if (!res.ok) {
             throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
           }
 
-          const data = await res.json();
-          setDutyTiming(data?.data);
+          const dutyTimingList = Array.isArray(data?.data) ? data.data : [];
+          const officeDefault =
+            dutyTimingList.find((d) => !d.department) || dutyTimingList[0];
+          setDutyTiming(officeDefault);
         } catch (error) {
           console.error("Error fetching duty timing:", error);
+        } finally {
+          setDutyTimingLoaded(true);
         }
       })();
     }
@@ -185,10 +238,12 @@ export default function ViewButton({
     }));
   };
 
-  // halfDayAllowed may not be loaded yet (or may be 0/missing) — fallback to 0
-  // instead of letting `undefined` propagate into NaN.
-  const halfDayAllowed = dutyTiming?.halfDayAllowed ?? 0;
-  const adjustedHalfDays = (presentLogs.totalHalfDays ?? 0) - halfDayAllowed;
+  // Only compute "Adjusted" once dutyTiming has actually finished loading —
+  // otherwise it briefly shows a misleading (halfDayAllowed=0) value before
+  // the real setting arrives. While loading, show "…" instead of a wrong number.
+  const adjustedHalfDays = dutyTimingLoaded
+    ? (presentLogs.totalHalfDays ?? 0) - (dutyTiming?.halfDayAllowed ?? 0)
+    : null;
 
   const leaveExtra = (
     <div>
@@ -198,14 +253,17 @@ export default function ViewButton({
         {localSalaryStructure.totalHolidayLeaves}
       </p>
       <p className="text-xs font-extralight">
-        Half Days: {presentLogs.totalHalfDays} (Adjusted: {adjustedHalfDays})
+        Half Days: {presentLogs.totalHalfDays} · Paid Days:{" "}
+        {localSalaryStructure.paidDays ?? "-"}
       </p>
     </div>
   );
 
   // Pen icon only shows when conveyance is enabled AND mode === "input".
   // "readonly" mode is percentage-driven (auto-calculated), never manually editable.
-  const canEditConveyance = conveyanceSettings?.enabled === true && conveyanceSettings?.mode === "input";
+  const canEditConveyance =
+    conveyanceSettings?.enabled === true &&
+    conveyanceSettings?.mode === "input";
 
   return (
     <div>
@@ -220,7 +278,7 @@ export default function ViewButton({
         <Modal.Body>
           <div className="mb-2">
             <p>Name: {name}</p>
-            <p>Month: {month}</p>
+            <p>Month: {formatMonthDisplay(month)}</p>
           </div>
           <div className="flex flex-col md:flex-row justify-evenly overflow-x-auto">
             <Table striped>
@@ -232,19 +290,36 @@ export default function ViewButton({
                 {/* Basic is always present in the breakdown, never conditionally unset */}
                 <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
                   <Table.Cell className="flex gap-2">Basic Salary</Table.Cell>
-                  <Table.Cell>{Math.round(localSalaryStructure?.basic)}</Table.Cell>
+                  <Table.Cell>
+                    {Math.round(localSalaryStructure?.basic)}
+                  </Table.Cell>
                 </Table.Row>
 
-                <ConditionalRow label="Hourly Pay" value={localSalaryStructure?.hourlyPay} />
-                <ConditionalRow label="Bonus" value={localSalaryStructure?.bonus} />
+                <ConditionalRow
+                  label="Hourly Pay"
+                  value={localSalaryStructure?.hourlyPay}
+                />
+                <ConditionalRow
+                  label="Bonus"
+                  value={localSalaryStructure?.bonus}
+                />
 
                 {/* DA — shows whenever da.enabled = true in Salary Structure */}
-                <ConditionalRow label="Dearness Allowance (DA)" value={localSalaryStructure?.da} />
+                <ConditionalRow
+                  label="Dearness Allowance (DA)"
+                  value={localSalaryStructure?.da}
+                />
 
                 {/* Other Allowance — shows whenever otherAllowance.enabled = true in Salary Structure */}
-                <ConditionalRow label="Other Allowance" value={localSalaryStructure?.otherAllowance} />
+                <ConditionalRow
+                  label="Other Allowance"
+                  value={localSalaryStructure?.otherAllowance}
+                />
 
-                <ConditionalRow label="House Rent Allowance" value={localSalaryStructure?.hra} />
+                <ConditionalRow
+                  label="House Rent Allowance"
+                  value={localSalaryStructure?.hra}
+                />
 
                 <EditableConveyanceRow
                   salaryId={salaryId}
@@ -253,7 +328,10 @@ export default function ViewButton({
                   onUpdated={handleConveyanceUpdated}
                 />
 
-                <ConditionalRow label="Special Allowance" value={localSalaryStructure?.specialAllowance} />
+                <ConditionalRow
+                  label="Special Allowance"
+                  value={localSalaryStructure?.specialAllowance}
+                />
               </Table.Body>
             </Table>
 
@@ -268,7 +346,10 @@ export default function ViewButton({
                     AND (for PF/ESI specifically) the staff has pfNo/esiNo set. */}
                 <ConditionalRow label="ESI" value={localSalaryStructure?.esi} />
                 <ConditionalRow label="PF" value={localSalaryStructure?.pf} />
-                <ConditionalRow label="Professional Tax" value={localSalaryStructure?.pTax} />
+                <ConditionalRow
+                  label="Professional Tax"
+                  value={localSalaryStructure?.pTax}
+                />
                 <ConditionalRow label="LWF" value={localSalaryStructure?.lwf} />
 
                 {/* Leave deduction always present */}
@@ -282,7 +363,10 @@ export default function ViewButton({
                   </Table.Cell>
                 </Table.Row>
 
-                <ConditionalRow label="Advance" value={localSalaryStructure?.advanceDeduction} />
+                <ConditionalRow
+                  label="Advance"
+                  value={localSalaryStructure?.advanceDeduction}
+                />
               </Table.Body>
             </Table>
           </div>

@@ -8,7 +8,7 @@ import { RiSettings4Line } from "react-icons/ri";
 
 const DEFAULT_STRUCTURE = {
   grossSalary: { calculationType: "fixed" },
-  basicSalary: { calculationType: "fixed", percentage: 50 },
+  basicSalary: { calculationType: "onGross", percentage: 50 },
   da: { enabled: false, percentage: 0 },
   otherAllowance: { enabled: false, percentage: 0 },
   hra: { enabled: false, calculateOn: "basic", percentage: 0 },
@@ -277,7 +277,7 @@ export default function EditStructure({ data = {} }) {
                 >
                   <option value="fixed">Fixed monthly salary</option>
                   <option value="perDay">
-                    No. of days × rate (prorated by attendance)
+                    No of days * Rate
                   </option>
                 </Select>
               </Field>
@@ -299,8 +299,10 @@ export default function EditStructure({ data = {} }) {
                     }
                     required
                   >
-                    <option value="fixed">Percentage of gross salary</option>
-                    <option value="perDay">Working days × per-day rate</option>
+                    <option value="onGross">On Gross Salary</option>
+                    <option value="onTotalSalary">
+                      On Total Salary
+                    </option>
                   </Select>
                 </Field>
                 <Field label="Basic salary (%)" htmlFor="basicPct">

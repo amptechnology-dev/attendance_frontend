@@ -62,6 +62,7 @@ export const getColumns = (officeSalaryStructure) => [
           salaryStructure={{
             ...info.row.original.breakdown,
             ...info.row.original.leaves,
+            paidDays: info.row.original.workedDays,
           }}
           conveyanceSettings={officeSalaryStructure?.conveyance}
           presentLogs={info.row.original.attendanceDetails}
