@@ -1,22 +1,25 @@
 "use client";
 
-import Calendar from "react-calendar";
+import dynamic from "next/dynamic";
 import "react-calendar/dist/Calendar.css";
-import { formatDate } from "date-fns";
+import { format } from "date-fns";
+
+// Calendar কে dynamic import করে SSR বন্ধ করছি
+const Calendar = dynamic(() => import("react-calendar"), {
+  ssr: false,
+});
 
 const HolidayCalendar = ({ holidays }) => {
-  // Function to determine if a date is a holiday (excluding weekends)
+  // date-fns এর ঠিক function হলো `format`, `formatDate` না
   const isHoliday = (date) => {
-    // Check if the date is in the demoHolidays array
     return holidays?.some((holiday) => {
       return (
-        formatDate(holiday.date, "yyyy-MM-dd") ===
-        formatDate(date, "yyyy-MM-dd")
+        format(new Date(holiday.date), "yyyy-MM-dd") ===
+        format(date, "yyyy-MM-dd")
       );
     });
   };
 
-  // Add a custom class to holiday tiles
   const tileClassName = ({ date, view }) => {
     if (view === "month" && isHoliday(date)) {
       return "font-bold !bg-red-200 rounded-lg";
@@ -33,9 +36,9 @@ const HolidayCalendar = ({ holidays }) => {
           tileClassName={tileClassName}
           calendarType="gregory"
           minDetail="month"
-          showNeighboringMonth={false} // Hide dates from neighboring months
-          next2Label={null} // Disable "Next Year" button
-          prev2Label={null} // Disable "Previous Year" button
+          showNeighboringMonth={false}
+          next2Label={null}
+          prev2Label={null}
         />
       </div>
     </div>

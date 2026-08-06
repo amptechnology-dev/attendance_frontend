@@ -9,17 +9,17 @@ export default function Component({ staffs = [], departments = [] }) {
   const [openModal, setOpenModal] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [filteredStaffs, setFilteredStaffs] = useState(staffs);
-  const [advanceAmount, setAdvanceAmount] = useState(0);
-  const [months, setMonths] = useState(0);
+  const [advanceAmount, setAdvanceAmount] = useState("");
+  const [months, setMonths] = useState("");
   const router = useRouter();
 
   useEffect(() => {
     if (selectedDepartment) {
       setFilteredStaffs(
-        staffs.filter((staff) => staff.department._id === selectedDepartment)
+        staffs.filter((staff) => staff.department?._id === selectedDepartment)
       );
     } else {
-      setFilteredStaffs(staffs); // Reset to all staffs (fallback)
+      setFilteredStaffs(staffs);
     }
   }, [selectedDepartment, staffs]);
 
@@ -51,6 +51,8 @@ export default function Component({ staffs = [], departments = [] }) {
           draggable: true,
         });
         e.target.reset();
+        setAdvanceAmount("");
+        setMonths("");
         onCloseModal();
         router.refresh();
       } else {
@@ -78,6 +80,11 @@ export default function Component({ staffs = [], departments = [] }) {
     }
   }
 
+  const monthlyAmount =
+    Number(months) > 0 && Number(advanceAmount) >= 0
+      ? Math.ceil(Number(advanceAmount) / Number(months))
+      : "";
+
   return (
     <>
       <Button color="blue" onClick={() => setOpenModal(true)}>
@@ -85,7 +92,7 @@ export default function Component({ staffs = [], departments = [] }) {
       </Button>
 
       <Modal show={openModal} size="md" onClose={onCloseModal}>
-        <Modal.Header> Add Advance </Modal.Header>
+        <Modal.Header>Add Advance</Modal.Header>
         <Modal.Body>
           <form onSubmit={handleSubmit}>
             <div className="space-y-6">
@@ -106,6 +113,7 @@ export default function Component({ staffs = [], departments = [] }) {
                   ))}
                 </Select>
               </div>
+
               <div>
                 <div className="mb-2 block">
                   <Label htmlFor="staff" value="Staff" />
@@ -121,6 +129,7 @@ export default function Component({ staffs = [], departments = [] }) {
                   ))}
                 </Select>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="mb-2 block">
@@ -135,32 +144,27 @@ export default function Component({ staffs = [], departments = [] }) {
                     min={0}
                   />
                 </div>
+
                 <div>
                   <div className="mb-2 block">
-                    <Label
-                      htmlFor="remaining_amount"
-                      value="Remaining Amount"
-                    />
+                    <Label htmlFor="remaining_amount" value="Remaining Amount" />
                   </div>
                   <TextInput
                     type="number"
                     id="remaining_amount"
                     name="remainingAmount"
                     min={0}
-                    onChange={(e) => {
-                      setAdvanceAmount(e.target.value);
-                    }}
+                    value={advanceAmount}
+                    onChange={(e) => setAdvanceAmount(e.target.value)}
                     required
                   />
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="mb-2 block">
-                    <Label
-                      htmlFor="remaining_months"
-                      value="Remaining Months"
-                    />
+                    <Label htmlFor="remaining_months" value="Remaining Months" />
                   </div>
                   <TextInput
                     type="number"
@@ -168,12 +172,12 @@ export default function Component({ staffs = [], departments = [] }) {
                     name="remainingMonths"
                     min={0}
                     max={48}
-                    onChange={(e) => {
-                      setMonths(e.target.value);
-                    }}
+                    value={months}
+                    onChange={(e) => setMonths(e.target.value)}
                     required
                   />
                 </div>
+
                 <div>
                   <div className="mb-2 block">
                     <Label htmlFor="amount_month" value="Monthly Amount" />
@@ -181,18 +185,21 @@ export default function Component({ staffs = [], departments = [] }) {
                   <TextInput
                     type="number"
                     id="amount_month"
-                    value={Math.ceil(advanceAmount / months)}
+                    value={monthlyAmount}
                     min={0}
                     disabled
+                    readOnly
                   />
                 </div>
               </div>
+
               <div>
                 <div className="mb-2 block">
                   <Label htmlFor="remark" value="Remarks (optional)" />
                 </div>
                 <TextInput type="text" id="remark" name="remarks" />
               </div>
+
               <div>
                 <Button type="submit" color="success" className="w-full">
                   Submit
