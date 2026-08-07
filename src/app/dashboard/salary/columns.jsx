@@ -3,11 +3,7 @@ import { format } from "date-fns";
 import ViewBreakdown from "./viewBreakdown";
 import ViewPresentLog from "./viewPresent";
 
-// Changed from a static `export const columns = [...]` array to a
-// function that accepts the office-wide SalaryStructure, because the
-// "Manage" column's ViewBreakdown needs conveyanceSettings (office-wide
-// config) to decide whether to show the edit-pen icon — that data isn't
-// available at module-load time, only after the page fetches it.
+
 export const getColumns = (officeSalaryStructure) => [
   {
     accessorKey: "month",
@@ -63,6 +59,8 @@ export const getColumns = (officeSalaryStructure) => [
             ...info.row.original.breakdown,
             ...info.row.original.leaves,
             paidDays: info.row.original.workedDays,
+            deductions: info.row.original.deductions, 
+            netSalary: info.row.original.netSalary,   
           }}
           conveyanceSettings={officeSalaryStructure?.conveyance}
           presentLogs={info.row.original.attendanceDetails}

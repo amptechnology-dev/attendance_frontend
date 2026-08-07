@@ -5,31 +5,82 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 
+function getNextMonthValue() {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function labelForPeriod(value) {
+  if (!value) return "";
+  const [y, m] = value.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("en-US", {
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function Component({ staffs = [], departments = [] }) {
   const [openModal, setOpenModal] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [filteredStaffs, setFilteredStaffs] = useState(staffs);
   const [advanceAmount, setAdvanceAmount] = useState("");
   const [months, setMonths] = useState("");
+  const [pausedMonths, setPausedMonths] = useState([]); // array of "yyyy-MM"
+  const [pauseInput, setPauseInput] = useState("");
   const router = useRouter();
 
   useEffect(() => {
     if (selectedDepartment) {
       setFilteredStaffs(
-        staffs.filter((staff) => staff.department?._id === selectedDepartment)
+        staffs.filter((s) => s.department?._id === selectedDepartment),
       );
     } else {
       setFilteredStaffs(staffs);
     }
   }, [selectedDepartment, staffs]);
 
+  function resetForm() {
+    setAdvanceAmount("");
+    setMonths("");
+    setPausedMonths([]);
+    setPauseInput("");
+  }
+
   function onCloseModal() {
     setOpenModal(false);
+    resetForm();
+  }
+
+  function addPauseMonth() {
+    if (!pauseInput) return;
+    if (pausedMonths.includes(pauseInput)) {
+      toast.info("Eta already list e ache.", { position: "bottom-right" });
+      return;
+    }
+    setPausedMonths([...pausedMonths, pauseInput].sort());
+    setPauseInput("");
+  }
+
+  function removePauseMonth(value) {
+    setPausedMonths(pausedMonths.filter((p) => p !== value));
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
+    const payload = Object.fromEntries(formData);
+
+    // "yyyy-MM" -> startMonth / startYear
+    if (payload.startPeriod) {
+      const [y, m] = payload.startPeriod.split("-");
+      payload.startYear = Number(y);
+      payload.startMonth = Number(m);
+      delete payload.startPeriod;
+    }
+
+    // paused months list attach koro
+    payload.pausedMonths = pausedMonths;
 
     try {
       const response = await fetch(
@@ -37,46 +88,27 @@ export default function Component({ staffs = [], departments = [] }) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(Object.fromEntries(formData)),
+          body: JSON.stringify(payload),
           credentials: "include",
-        }
+        },
       );
 
       if (response.ok) {
         toast.success("Advance added successfully!", {
           position: "bottom-right",
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
         });
         e.target.reset();
-        setAdvanceAmount("");
-        setMonths("");
+        resetForm();
         onCloseModal();
         router.refresh();
       } else {
         const error = await response.json();
-        console.log(error);
-
-        error.errors?.forEach((error) => {
-          toast.error(error.message, {
-            position: "bottom-right",
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-          });
-        });
+        error.errors?.forEach((err) =>
+          toast.error(err.message, { position: "bottom-right" }),
+        );
       }
     } catch (error) {
-      toast.error(error.message, {
-        position: "bottom-right",
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
+      toast.error(error.message, { position: "bottom-right" });
     }
   }
 
@@ -133,6 +165,37 @@ export default function Component({ staffs = [], departments = [] }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="mb-2 block">
+                    <Label htmlFor="dateTaken" value="Advance Taken On" />
+                  </div>
+                  <TextInput
+                    type="date"
+                    id="dateTaken"
+                    name="dateTaken"
+                    required
+                    defaultValue={new Date().toISOString().slice(0, 10)}
+                  />
+                </div>
+
+                <div>
+                  <div className="mb-2 block">
+                    <Label
+                      htmlFor="startPeriod"
+                      value="Deduction Start Month"
+                    />
+                  </div>
+                  <TextInput
+                    type="month"
+                    id="startPeriod"
+                    name="startPeriod"
+                    required
+                    defaultValue={getNextMonthValue()}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="mb-2 block">
                     <Label htmlFor="total" value="Total Amount" />
                   </div>
                   <TextInput
@@ -147,7 +210,10 @@ export default function Component({ staffs = [], departments = [] }) {
 
                 <div>
                   <div className="mb-2 block">
-                    <Label htmlFor="remaining_amount" value="Remaining Amount" />
+                    <Label
+                      htmlFor="remaining_amount"
+                      value="Remaining Amount"
+                    />
                   </div>
                   <TextInput
                     type="number"
@@ -164,7 +230,10 @@ export default function Component({ staffs = [], departments = [] }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="mb-2 block">
-                    <Label htmlFor="remaining_months" value="Remaining Months" />
+                    <Label
+                      htmlFor="remaining_months"
+                      value="Remaining Months"
+                    />
                   </div>
                   <TextInput
                     type="number"
@@ -191,6 +260,54 @@ export default function Component({ staffs = [], departments = [] }) {
                     readOnly
                   />
                 </div>
+              </div>
+
+              {/* NEW — Pause specific deduction month(s), from creation time itself */}
+              <div>
+                <div className="mb-2 block">
+                  <Label value="Pause Deduction For Specific Month(s) (optional)" />
+                </div>
+                <div className="flex gap-2">
+                  <TextInput
+                    type="month"
+                    value={pauseInput}
+                    onChange={(e) => setPauseInput(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    color="warning"
+                    onClick={addPauseMonth}
+                    disabled={!pauseInput}
+                  >
+                    + Add
+                  </Button>
+                </div>
+
+                {pausedMonths.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {pausedMonths.map((p) => (
+                      <span
+                        key={p}
+                        className="flex items-center gap-1 bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded"
+                      >
+                        {labelForPeriod(p)}
+                        <button
+                          type="button"
+                          onClick={() => removePauseMonth(p)}
+                          className="ml-1 font-bold"
+                          title="Remove"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Ei mash gulote deduction hobe na (bonus month, ba onno
+                  karone). Baki mash normal cholbe.
+                </p>
               </div>
 
               <div>

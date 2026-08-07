@@ -31,23 +31,17 @@ const MONTH_NAMES = [
   "December",
 ];
 
-// Converts a "6 - 2026" style string (or a raw month number + year) into
-// "June - 2026". Falls back to the original string if parsing fails,
-// so this never crashes on unexpected formats.
 function formatMonthDisplay(month) {
   const match = String(month).match(/^(\d{1,2})\s*-\s*(\d{4})$/);
   if (!match) return month;
-
   const monthNum = Number(match[1]);
   const year = match[2];
   const monthName = MONTH_NAMES[monthNum - 1];
-
   return monthName ? `${monthName} - ${year}` : month;
 }
 
 function ConditionalRow({ label, value, extra = null }) {
   if (value === undefined || value === null) return null;
-
   return (
     <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
       <Table.Cell className="flex gap-2">
@@ -59,11 +53,15 @@ function ConditionalRow({ label, value, extra = null }) {
   );
 }
 
-// Editable row for conveyance. Pen icon only shows when the office's
-// Salary Structure has conveyance.enabled === true AND mode === "input"
-// (readonly/% mode is auto-calculated and must never be manually edited).
-// Calls PUT /salary/:salaryId/conveyance/update with { amount }.
-function EditableConveyanceRow({ salaryId, value, canEdit, onUpdated }) {
+function EditableAmountRow({
+  label,
+  salaryId,
+  value,
+  canEdit,
+  endpointSuffix, // e.g. "conveyance/update" or "advance/update"
+  onUpdated,
+  helperText = null,
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(value ?? 0);
   const [saving, setSaving] = useState(false);
@@ -88,7 +86,7 @@ function EditableConveyanceRow({ salaryId, value, canEdit, onUpdated }) {
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/${salaryId}/conveyance/update`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/${salaryId}/${endpointSuffix}`,
         {
           method: "PUT",
           credentials: "include",
@@ -106,8 +104,8 @@ function EditableConveyanceRow({ salaryId, value, canEdit, onUpdated }) {
       onUpdated?.(data.data);
       setIsEditing(false);
     } catch (err) {
-      console.error("Error updating conveyance:", err);
-      setError(err.message || "Failed to update conveyance.");
+      console.error(`Error updating ${label}:`, err);
+      setError(err.message || `Failed to update ${label}.`);
     } finally {
       setSaving(false);
     }
@@ -122,17 +120,22 @@ function EditableConveyanceRow({ salaryId, value, canEdit, onUpdated }) {
   return (
     <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
       <Table.Cell className="flex gap-2 items-center">
-        Conveyance Allowance
-        {canEdit && !isEditing && (
-          <button
-            type="button"
-            onClick={() => setIsEditing(true)}
-            className="text-gray-500 hover:text-gray-800"
-            title="Edit conveyance"
-          >
-            <RiPencilLine className="w-4 h-4" />
-          </button>
-        )}
+        <div>
+          <div className="flex items-center gap-2">
+            {label}
+            {canEdit && !isEditing && (
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="text-gray-500 hover:text-gray-800"
+                title={`Edit ${label}`}
+              >
+                <RiPencilLine className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          {helperText}
+        </div>
       </Table.Cell>
       <Table.Cell>
         {isEditing ? (
@@ -183,11 +186,11 @@ function EditableConveyanceRow({ salaryId, value, canEdit, onUpdated }) {
 }
 
 export default function ViewButton({
-  salaryId = "", // Salary document _id — required for the conveyance update API
+  salaryId = "",
   name = "",
-  month = "", // display string, e.g. "6 - 2026" — rendered as "June - 2026"
-  salaryStructure = {}, // per-staff breakdown + leaves (existing usage, unchanged)
-  conveyanceSettings = {}, // office-wide SalaryStructure.conveyance config: { enabled, mode, percentage }
+  month = "",
+  salaryStructure = {},
+  conveyanceSettings = {},
   presentLogs = {},
 }) {
   const [openModal, setOpenModal] = useState(false);
@@ -217,6 +220,7 @@ export default function ViewButton({
             throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
           }
 
+          const data = await res.json(); // FIXED — was missing, caused "data is not defined"
           const dutyTimingList = Array.isArray(data?.data) ? data.data : [];
           const officeDefault =
             dutyTimingList.find((d) => !d.department) || dutyTimingList[0];
@@ -230,17 +234,16 @@ export default function ViewButton({
     }
   }, [openModal]);
 
-  const handleConveyanceUpdated = (recalculatedSalary) => {
+  const handleSalaryUpdated = (recalculatedSalary) => {
     setLocalSalaryStructure((prev) => ({
       ...prev,
       ...recalculatedSalary?.breakdown,
       ...recalculatedSalary?.leaves,
+      deductions: recalculatedSalary?.deductions,
+      netSalary: recalculatedSalary?.netSalary,
     }));
   };
 
-  // Only compute "Adjusted" once dutyTiming has actually finished loading —
-  // otherwise it briefly shows a misleading (halfDayAllowed=0) value before
-  // the real setting arrives. While loading, show "…" instead of a wrong number.
   const adjustedHalfDays = dutyTimingLoaded
     ? (presentLogs.totalHalfDays ?? 0) - (dutyTiming?.halfDayAllowed ?? 0)
     : null;
@@ -259,8 +262,6 @@ export default function ViewButton({
     </div>
   );
 
-  // Pen icon only shows when conveyance is enabled AND mode === "input".
-  // "readonly" mode is percentage-driven (auto-calculated), never manually editable.
   const canEditConveyance =
     conveyanceSettings?.enabled === true &&
     conveyanceSettings?.mode === "input";
@@ -287,7 +288,6 @@ export default function ViewButton({
                 <Table.HeadCell>Amount</Table.HeadCell>
               </Table.Head>
               <Table.Body className="divide-y">
-                {/* Basic is always present in the breakdown, never conditionally unset */}
                 <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
                   <Table.Cell className="flex gap-2">Basic Salary</Table.Cell>
                   <Table.Cell>
@@ -303,29 +303,26 @@ export default function ViewButton({
                   label="Bonus"
                   value={localSalaryStructure?.bonus}
                 />
-
-                {/* DA — shows whenever da.enabled = true in Salary Structure */}
                 <ConditionalRow
                   label="Dearness Allowance (DA)"
                   value={localSalaryStructure?.da}
                 />
-
-                {/* Other Allowance — shows whenever otherAllowance.enabled = true in Salary Structure */}
                 <ConditionalRow
                   label="Other Allowance"
                   value={localSalaryStructure?.otherAllowance}
                 />
-
                 <ConditionalRow
                   label="House Rent Allowance"
                   value={localSalaryStructure?.hra}
                 />
 
-                <EditableConveyanceRow
+                <EditableAmountRow
+                  label="Conveyance Allowance"
                   salaryId={salaryId}
                   value={localSalaryStructure?.conveyance}
                   canEdit={canEditConveyance}
-                  onUpdated={handleConveyanceUpdated}
+                  endpointSuffix="conveyance/update"
+                  onUpdated={handleSalaryUpdated}
                 />
 
                 <ConditionalRow
@@ -341,9 +338,6 @@ export default function ViewButton({
                 <Table.HeadCell>Amount</Table.HeadCell>
               </Table.Head>
               <Table.Body className="divide-y">
-                {/* Each of these renders only if the value actually exists in the
-                    breakdown — i.e. the toggle was enabled in Salary Structure
-                    AND (for PF/ESI specifically) the staff has pfNo/esiNo set. */}
                 <ConditionalRow label="ESI" value={localSalaryStructure?.esi} />
                 <ConditionalRow label="PF" value={localSalaryStructure?.pf} />
                 <ConditionalRow
@@ -352,7 +346,6 @@ export default function ViewButton({
                 />
                 <ConditionalRow label="LWF" value={localSalaryStructure?.lwf} />
 
-                {/* Leave deduction always present */}
                 <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
                   <Table.Cell>
                     Leave
@@ -363,12 +356,22 @@ export default function ViewButton({
                   </Table.Cell>
                 </Table.Row>
 
-                <ConditionalRow
-                  label="Advance"
+                <EditableAmountRow
+                  label="Advance Deduction"
+                  salaryId={salaryId}
                   value={localSalaryStructure?.advanceDeduction}
+                  canEdit={true}
+                  endpointSuffix="advance/update"
+                  onUpdated={handleSalaryUpdated}
                 />
               </Table.Body>
             </Table>
+          </div>
+
+          <div className="mt-4 text-right font-semibold">
+            Net Salary: ₹{Math.round(localSalaryStructure?.netSalary ?? 0)}{" "}
+            &nbsp;|&nbsp; Total Deductions: ₹
+            {Math.round(localSalaryStructure?.deductions ?? 0)}
           </div>
         </Modal.Body>
       </Modal>
