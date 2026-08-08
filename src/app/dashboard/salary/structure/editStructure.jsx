@@ -10,6 +10,7 @@ const DEFAULT_STRUCTURE = {
   grossSalary: { calculationType: "fixed" },
   basicSalary: { calculationType: "onGross", percentage: 50 },
   da: { enabled: false, percentage: 0 },
+  overtime: { enabled: false, slotMinutes: 30, multiplier: 1.5 },
   otherAllowance: { enabled: false, percentage: 0 },
   hra: { enabled: false, calculateOn: "basic", percentage: 0 },
   conveyance: { enabled: false, mode: "input", percentage: 0 },
@@ -62,6 +63,7 @@ const NUMERIC_FIELD_PATHS = [
   ["conveyance", "percentage"],
   ["pf", "rate"],
   ["pf", "wageCeiling"],
+  ["overtime", "multiplier"],
   ["esi", "rate"],
   ["esi", "wageCeiling"],
   ["lwf", "wageCeiling"],
@@ -276,9 +278,7 @@ export default function EditStructure({ data = {} }) {
                   required
                 >
                   <option value="fixed">Fixed monthly salary</option>
-                  <option value="perDay">
-                    No of days * Rate
-                  </option>
+                  <option value="perDay">No of days * Rate</option>
                 </Select>
               </Field>
             </Section>
@@ -300,9 +300,7 @@ export default function EditStructure({ data = {} }) {
                     required
                   >
                     <option value="onGross">On Gross Salary</option>
-                    <option value="onTotalSalary">
-                      On Total Salary
-                    </option>
+                    <option value="onTotalSalary">On Total Salary</option>
                   </Select>
                 </Field>
                 <Field label="Basic salary (%)" htmlFor="basicPct">
@@ -620,6 +618,47 @@ export default function EditStructure({ data = {} }) {
                   </Field>
                 </div>
               </div>
+            </Section>
+
+            {/* ---------- OVERTIME ---------- */}
+            <Section
+              title="Overtime"
+              description="Duty-timing শেষে যে সময় extra কাজ করবে সেটার উপর ভিত্তি করে slot-wise pay"
+              toggle
+              checked={form.overtime.enabled}
+              onToggle={(v) => update("overtime", "enabled", v)}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="Slot duration" htmlFor="otSlot">
+                  <Select
+                    id="otSlot"
+                    value={form.overtime.slotMinutes}
+                    onChange={(e) =>
+                      update("overtime", "slotMinutes", Number(e.target.value))
+                    }
+                    required
+                  >
+                    <option value={30}>30 minutes</option>
+                    <option value={60}>60 minutes</option>
+                  </Select>
+                </Field>
+                <Field label="Divisor (multiplier)" htmlFor="otMultiplier">
+                  <TextInput
+                    id="otMultiplier"
+                    type="text"
+                    inputMode="decimal"
+                    value={form.overtime.multiplier}
+                    onChange={(e) =>
+                      updateNumeric("overtime", "multiplier", e.target.value)
+                    }
+                    required
+                  />
+                </Field>
+              </div>
+              <p className="mt-2 rounded-md bg-gray-100 dark:bg-gray-700 px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
+                Formula: (Monthly Salary × No. of Slots) ÷ (Days in Month ×{" "}
+                {form.overtime.multiplier || 1.5})
+              </p>
             </Section>
 
             {/* ---------- BONUS RATE ---------- */}

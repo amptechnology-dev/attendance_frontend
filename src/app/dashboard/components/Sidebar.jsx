@@ -34,7 +34,6 @@ const customTheme = {
   },
 };
 
-// Static path arrays — component এর বাইরে, যাতে প্রতি render এ নতুন array তৈরি না হয়
 const DATE_TIME_PATHS = [
   "/dashboard/year-and-month",
   "/dashboard/duty-timings",
@@ -278,6 +277,13 @@ export function AdminSidebar() {
                 active={isActive("/dashboard/salary")}
               >
                 Staff Salary
+              </NavItem>
+              <NavItem
+                href="/dashboard/salary/overtime"
+                icon={HiOutlineAdjustments}
+                active={isActive("/dashboard/salary/overtime")}
+              >
+                Overtime
               </NavItem>
               <NavItem
                 href="/dashboard/salary/advance"

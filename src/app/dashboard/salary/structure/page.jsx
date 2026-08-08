@@ -179,6 +179,17 @@ export default async function SalaryStructure() {
           </TableRow>
 
           <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
+            <TableCell className="flex items-center gap-2">
+              Overtime <StatusBadge enabled={s?.overtime?.enabled} />
+            </TableCell>
+            <TableCell>
+              {s?.overtime?.enabled
+                ? `${s.overtime.slotMinutes} min/slot — (Salary × Slots) ÷ (Days × ${s.overtime.multiplier})`
+                : "—"}
+            </TableCell>
+          </TableRow>
+
+          <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
             <TableCell>Bonus Rate</TableCell>
             <TableCell>{s?.bonus_rate}%</TableCell>
           </TableRow>
