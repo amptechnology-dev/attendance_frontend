@@ -9,6 +9,7 @@ import {
   Spinner,
 } from "flowbite-react";
 import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 import {
   RiFileList3Line,
   RiPencilLine,
@@ -77,7 +78,9 @@ function EditableAmountRow({
     const amount = Number(inputValue);
 
     if (Number.isNaN(amount) || amount < 0) {
-      setError("Enter a valid non-negative amount.");
+      const msg = "Enter a valid non-negative amount.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -98,14 +101,20 @@ function EditableAmountRow({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data?.message || `Request failed: ${res.status}`);
+        const backendMessage = Array.isArray(data?.errors)
+          ? data.errors.map((e) => e.message || e).join(", ")
+          : data?.errors || data?.message || `Request failed: ${res.status}`;
+        throw new Error(backendMessage);
       }
 
       onUpdated?.(data.data);
+      toast.success(`${label} updated successfully.`);
       setIsEditing(false);
     } catch (err) {
       console.error(`Error updating ${label}:`, err);
-      setError(err.message || `Failed to update ${label}.`);
+      const msg = err.message || `Failed to update ${label}.`;
+      setError(msg);
+      toast.error(msg, { position: "bottom-right" });
     } finally {
       setSaving(false);
     }

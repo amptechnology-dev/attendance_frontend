@@ -50,11 +50,7 @@ function notify(type, message) {
   });
 }
 
-// ================================================================
-// NUMERIC FIELD PATHS — every field that must be coerced to a Number
-// right before submit (kept as raw string in state while editing, so
-// clearing/retyping doesn't fight React's controlled-input re-render).
-// ================================================================
+
 const NUMERIC_FIELD_PATHS = [
   ["basicSalary", "percentage"],
   ["da", "percentage"],
@@ -64,6 +60,7 @@ const NUMERIC_FIELD_PATHS = [
   ["pf", "rate"],
   ["pf", "wageCeiling"],
   ["overtime", "multiplier"],
+  ["overtime", "slotMinutes"],   
   ["esi", "rate"],
   ["esi", "wageCeiling"],
   ["lwf", "wageCeiling"],
@@ -623,24 +620,28 @@ export default function EditStructure({ data = {} }) {
             {/* ---------- OVERTIME ---------- */}
             <Section
               title="Overtime"
-              description="Duty-timing শেষে যে সময় extra কাজ করবে সেটার উপর ভিত্তি করে slot-wise pay"
               toggle
               checked={form.overtime.enabled}
               onToggle={(v) => update("overtime", "enabled", v)}
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Field label="Slot duration" htmlFor="otSlot">
-                  <Select
-                    id="otSlot"
-                    value={form.overtime.slotMinutes}
-                    onChange={(e) =>
-                      update("overtime", "slotMinutes", Number(e.target.value))
-                    }
-                    required
-                  >
-                    <option value={30}>30 minutes</option>
-                    <option value={60}>60 minutes</option>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <TextInput
+                      id="otSlot"
+                      type="text"
+                      inputMode="decimal"
+                      value={form.overtime.slotMinutes}
+                      onChange={(e) =>
+                        updateNumeric("overtime", "slotMinutes", e.target.value)
+                      }
+                      required
+                      className="w-full"
+                    />
+                    <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      minutes
+                    </span>
+                  </div>
                 </Field>
                 <Field label="Divisor (multiplier)" htmlFor="otMultiplier">
                   <TextInput
