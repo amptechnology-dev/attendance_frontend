@@ -24,7 +24,7 @@ const DEFAULT_STRUCTURE = {
     wageCeiling: 15000,
     fixedAmount: 25,
   },
-  bonus_rate: 8.33,
+  bonus: { mode: "manual", rules: [] },
 };
 
 // Merge saved data over defaults so missing keys (new fields, old records) never crash the form
@@ -50,7 +50,6 @@ function notify(type, message) {
   });
 }
 
-
 const NUMERIC_FIELD_PATHS = [
   ["basicSalary", "percentage"],
   ["da", "percentage"],
@@ -60,7 +59,7 @@ const NUMERIC_FIELD_PATHS = [
   ["pf", "rate"],
   ["pf", "wageCeiling"],
   ["overtime", "multiplier"],
-  ["overtime", "slotMinutes"],   
+  ["overtime", "slotMinutes"],
   ["esi", "rate"],
   ["esi", "wageCeiling"],
   ["lwf", "wageCeiling"],
@@ -68,8 +67,6 @@ const NUMERIC_FIELD_PATHS = [
   ["bonus_rate", null],
 ];
 
-// Converts all numeric-looking string fields to actual Numbers right
-// before sending to the API. Empty string -> 0 (safe default).
 function sanitizeNumbersForSubmit(form) {
   const sanitized = structuredClone(form);
   NUMERIC_FIELD_PATHS.forEach(([section, field]) => {
@@ -79,6 +76,19 @@ function sanitizeNumbersForSubmit(form) {
       sanitized[section][field] = Number(sanitized[section][field]) || 0;
     }
   });
+
+  if (sanitized.bonus.mode === "auto") {
+    sanitized.bonus.rules = sanitized.bonus.rules.map((rule) => ({
+      lastMonth: Number(rule.lastMonth) || 1,
+      lastYear: Number(rule.lastYear) || new Date().getFullYear(),
+      backMonths: Number(rule.backMonths) || 1,
+      minTenureMonths: Number(rule.minTenureMonths) || 0,
+      percentage: Number(rule.percentage) || 0,
+    }));
+  } else {
+    sanitized.bonus.rules = [];
+  }
+
   return sanitized;
 }
 
@@ -170,6 +180,133 @@ function Field({ label, htmlFor, children }) {
         className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300"
       />
       {children}
+    </div>
+  );
+}
+
+function emptyBonusRule() {
+  const now = new Date();
+  return {
+    lastMonth: now.getMonth() + 1,
+    lastYear: now.getFullYear(),
+    backMonths: 10,
+    minTenureMonths: 0,
+    percentage: 8.33,
+  };
+}
+
+function BonusRulesEditor({ rules, onChange }) {
+  function updateRule(index, field, value) {
+    const next = rules.map((rule, i) =>
+      i === index ? { ...rule, [field]: value } : rule,
+    );
+    onChange(next);
+  }
+
+  function updateRuleNumeric(index, field, rawValue) {
+    if (rawValue !== "" && !/^\d*\.?\d*$/.test(rawValue)) return;
+    updateRule(index, field, rawValue);
+  }
+
+  function addRule() {
+    onChange([...rules, emptyBonusRule()]);
+  }
+
+  function removeRule(index) {
+    onChange(rules.filter((_, i) => i !== index));
+  }
+
+  return (
+    <div className="space-y-3">
+      {rules.length === 0 && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          No bonus rule added yet. Add one to define how the bonus is
+          calculated.
+        </p>
+      )}
+
+      {rules.map((rule, index) => (
+        <div
+          key={index}
+          className="rounded-md border border-gray-200 dark:border-gray-700 p-3 space-y-2"
+        >
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <Field label="Last month" htmlFor={`ruleMonth-${index}`}>
+              <Select
+                id={`ruleMonth-${index}`}
+                value={rule.lastMonth}
+                onChange={(e) =>
+                  updateRule(index, "lastMonth", Number(e.target.value))
+                }
+              >
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <option key={m} value={m}>
+                    {new Date(2000, m - 1).toLocaleString("en-US", {
+                      month: "long",
+                    })}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+            <Field label="Last year" htmlFor={`ruleYear-${index}`}>
+              <TextInput
+                id={`ruleYear-${index}`}
+                type="text"
+                inputMode="numeric"
+                value={rule.lastYear}
+                onChange={(e) =>
+                  updateRuleNumeric(index, "lastYear", e.target.value)
+                }
+              />
+            </Field>
+
+            <Field label="Back months" htmlFor={`ruleBack-${index}`}>
+              <TextInput
+                id={`ruleBack-${index}`}
+                type="text"
+                inputMode="numeric"
+                value={rule.backMonths}
+                onChange={(e) =>
+                  updateRuleNumeric(index, "backMonths", e.target.value)
+                }
+              />
+            </Field>
+
+            <Field label="Min tenure (months)" htmlFor={`ruleTenure-${index}`}>
+              <TextInput
+                id={`ruleTenure-${index}`}
+                type="text"
+                inputMode="numeric"
+                value={rule.minTenureMonths}
+                onChange={(e) =>
+                  updateRuleNumeric(index, "minTenureMonths", e.target.value)
+                }
+              />
+            </Field>
+
+            <Field label="Percentage (%)" htmlFor={`rulePct-${index}`}>
+              <TextInput
+                id={`rulePct-${index}`}
+                type="text"
+                inputMode="decimal"
+                value={rule.percentage}
+                onChange={(e) =>
+                  updateRuleNumeric(index, "percentage", e.target.value)
+                }
+              />
+            </Field>
+          </div>
+
+          <Button size="xs" color="failure" onClick={() => removeRule(index)}>
+            Remove rule
+          </Button>
+        </div>
+      ))}
+
+      <Button size="xs" color="light" onClick={addRule}>
+        + Add bonus rule
+      </Button>
     </div>
   );
 }
@@ -662,20 +799,36 @@ export default function EditStructure({ data = {} }) {
               </p>
             </Section>
 
-            {/* ---------- BONUS RATE ---------- */}
-            <Section title="Bonus Rate" toggle={null}>
-              <Field label="Bonus rate (%)" htmlFor="bonusRate">
-                <TextInput
-                  id="bonusRate"
-                  type="text"
-                  inputMode="decimal"
-                  value={form.bonus_rate}
-                  onChange={(e) =>
-                    updateNumeric("bonus_rate", null, e.target.value)
-                  }
-                  required
+            {/* ---------- BONUS ---------- */}
+            <Section
+              title="Bonus"
+              description="Manual entry per staff, or auto-calculated from past net salaries"
+              toggle={null}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                <Field label="Mode" htmlFor="bonusMode">
+                  <Select
+                    id="bonusMode"
+                    value={form.bonus.mode}
+                    onChange={(e) => update("bonus", "mode", e.target.value)}
+                    required
+                  >
+                    <option value="manual">
+                      Manual — enter amount per staff
+                    </option>
+                    <option value="auto">
+                      Auto — calculate from past salaries
+                    </option>
+                  </Select>
+                </Field>
+              </div>
+
+              {form.bonus.mode === "auto" && (
+                <BonusRulesEditor
+                  rules={form.bonus.rules}
+                  onChange={(rules) => update("bonus", "rules", rules)}
                 />
-              </Field>
+              )}
             </Section>
 
             <div className="sticky bottom-0 -mx-6 -mb-6 border-t border-gray-200 bg-white px-6 py-3 dark:border-gray-700 dark:bg-gray-800">

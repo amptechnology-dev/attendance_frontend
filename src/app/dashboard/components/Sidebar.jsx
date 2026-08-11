@@ -307,6 +307,13 @@ export function AdminSidebar() {
               >
                 Salary Register
               </NavItem>
+               <NavItem
+                href="/dashboard/salary/bonus"
+                icon={TbMoneybag}
+                active={isActive("/dashboard/salary/bonus")}
+              >
+                Bonus
+              </NavItem>
             </Sidebar.Collapse>
           )}
 

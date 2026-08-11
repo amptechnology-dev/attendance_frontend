@@ -190,8 +190,14 @@ export default async function SalaryStructure() {
           </TableRow>
 
           <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
-            <TableCell>Bonus Rate</TableCell>
-            <TableCell>{s?.bonus_rate}%</TableCell>
+            <TableCell className="flex items-center gap-2">
+              Bonus <StatusBadge enabled={s?.bonus?.mode === "auto"} />
+            </TableCell>
+            <TableCell>
+              {s?.bonus?.mode === "auto"
+                ? `Auto — ${s.bonus.rules?.length || 0} rule(s) configured`
+                : "Manual entry per staff"}
+            </TableCell>
           </TableRow>
         </TableBody>
       </Table>
