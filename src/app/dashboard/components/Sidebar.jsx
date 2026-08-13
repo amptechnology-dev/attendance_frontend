@@ -278,13 +278,13 @@ export function AdminSidebar() {
               >
                 Staff Salary
               </NavItem>
-              <NavItem
+              {/* <NavItem
                 href="/dashboard/salary/overtime"
                 icon={HiOutlineAdjustments}
                 active={isActive("/dashboard/salary/overtime")}
               >
                 Overtime
-              </NavItem>
+              </NavItem> */}
               <NavItem
                 href="/dashboard/salary/advance"
                 icon={TbMoneybag}

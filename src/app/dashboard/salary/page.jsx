@@ -2,6 +2,7 @@ import TabsWithDatatable from "./tabs";
 import { fetchWithCookies } from "@/lib/fetchWithCookies";
 import { redirect } from "next/navigation";
 import CalculateSalaryButton from "./calculateSalaryButton";
+import FreezeSalaryPanel from "./freezeSalaryPanel";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -41,9 +42,10 @@ export default async function Page() {
 
   return (
     <div>
-      <div className="mb-5">
+      <div className="mb-5 flex flex-wrap items-center gap-3">
         <CalculateSalaryButton />
       </div>
+      <FreezeSalaryPanel />
       <TabsWithDatatable
         allSalaryData={allSalaryData}
         previousMonthSalary={previousMonthSalary}

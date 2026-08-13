@@ -8,10 +8,10 @@ import {
   Label,
   TextInput,
   Checkbox,
-  Modal,
 } from "flowbite-react";
-import { HiOutlineExclamationCircle } from "react-icons/hi";
 import { toast } from "react-toastify";
+import { useRouter } from "next/navigation";
+import { RiArrowLeftLine } from "react-icons/ri";
 
 const MONTH_NAMES = [
   "January",
@@ -52,6 +52,7 @@ function TriStateCheckbox({ checked, indeterminate, onChange, disabled }) {
 }
 
 export default function OvertimePanel({ overtimeEnabled }) {
+  const router = useRouter();
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
@@ -62,20 +63,14 @@ export default function OvertimePanel({ overtimeEnabled }) {
   const [manualSlots, setManualSlots] = useState({});
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
-  const [freezing, setFreezing] = useState(false);
-  const [showFreezeModal, setShowFreezeModal] = useState(false);
-
-  // Unfreeze (OTP) flow state
-  const [showUnfreezeModal, setShowUnfreezeModal] = useState(false);
-  const [unfreezeStep, setUnfreezeStep] = useState("request"); // "request" | "verify"
-  const [otpValue, setOtpValue] = useState("");
-  const [otpMobile, setOtpMobile] = useState("");
-  const [unfreezing, setUnfreezing] = useState(false);
 
   const allStaff = report.flatMap((dept) => dept.staff);
-  const allDateKeys = allStaff.flatMap((s) => s.dates.map((d) => `${s.staffId}::${d.date}`));
+  const allDateKeys = allStaff.flatMap((s) =>
+    s.dates.map((d) => `${s.staffId}::${d.date}`),
+  );
   const selectedCount = allDateKeys.filter((k) => selected[k]).length;
-  const isAllSelected = allDateKeys.length > 0 && selectedCount === allDateKeys.length;
+  const isAllSelected =
+    allDateKeys.length > 0 && selectedCount === allDateKeys.length;
   const isSomeSelected = selectedCount > 0 && !isAllSelected;
 
   async function fetchReport() {
@@ -87,7 +82,9 @@ export default function OvertimePanel({ overtimeEnabled }) {
       );
       const data = await res.json();
       if (!res.ok)
-        throw new Error(data?.errors || data?.message || "Failed to fetch overtime report");
+        throw new Error(
+          data?.errors || data?.message || "Failed to fetch overtime report",
+        );
 
       const departments = data.data?.departments || [];
 
@@ -192,7 +189,9 @@ export default function OvertimePanel({ overtimeEnabled }) {
       );
       const data = await res.json();
       if (!res.ok)
-        throw new Error(data?.errors || data?.message || "Failed to apply overtime");
+        throw new Error(
+          data?.errors || data?.message || "Failed to apply overtime",
+        );
       toast.success("Overtime applied successfully!");
       fetchReport();
     } catch (error) {
@@ -202,95 +201,21 @@ export default function OvertimePanel({ overtimeEnabled }) {
     }
   }
 
-  async function confirmFreeze() {
-    setFreezing(true);
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/freeze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ month, year }),
-      });
-      const data = await res.json();
-      if (!res.ok)
-        throw new Error(data?.errors || data?.message || "Failed to freeze salary");
-      toast.success("Salary frozen successfully!");
-      setShowFreezeModal(false);
-      fetchReport();
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setFreezing(false);
-    }
-  }
-
-  function openUnfreezeModal() {
-    setUnfreezeStep("request");
-    setOtpValue("");
-    setShowUnfreezeModal(true);
-  }
-
-  async function requestUnfreeze() {
-    setUnfreezing(true);
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/unfreeze/request-otp`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ month, year }),
-        },
-      );
-      const data = await res.json();
-      if (!res.ok)
-        throw new Error(data?.errors || data?.message || "Failed to send OTP");
-      setOtpMobile(data.data?.mobile || "");
-      setUnfreezeStep("verify");
-      toast.success("OTP sent to your registered mobile number.");
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setUnfreezing(false);
-    }
-  }
-
-  async function confirmUnfreeze() {
-    if (!otpValue) {
-      toast.error("Please enter the OTP.");
-      return;
-    }
-    setUnfreezing(true);
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/unfreeze/confirm`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ month, year, otp: otpValue }),
-        },
-      );
-      const data = await res.json();
-      if (!res.ok)
-        throw new Error(data?.errors || data?.message || "Failed to verify OTP");
-      toast.success("Salary unfrozen successfully!");
-      setShowUnfreezeModal(false);
-      setUnfreezeStep("request");
-      setOtpValue("");
-      fetchReport();
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setUnfreezing(false);
-    }
-  }
-
   if (!overtimeEnabled) {
     return (
       <Card>
+        <Button
+          color="light"
+          size="sm"
+          onClick={() => router.push("/dashboard/salary")}
+          className="mb-3"
+        >
+          <RiArrowLeftLine className="mr-2 h-4 w-4" />
+          Back to Salary
+        </Button>
         <p className="text-sm text-gray-500">
-          Overtime is not enabled in Salary Structure settings. Please enable it first.
+          Overtime is not enabled in Salary Structure settings. Please enable it
+          first.
         </p>
       </Card>
     );
@@ -299,6 +224,16 @@ export default function OvertimePanel({ overtimeEnabled }) {
   return (
     <div className="space-y-4">
       <Card>
+        <div className="flex items-center justify-between mb-2">
+          <Button
+            color="light"
+            size="sm"
+            onClick={() => router.push("/dashboard/salary")}
+          >
+            <RiArrowLeftLine className="mr-2 h-4 w-4" />
+            Back to Salary
+          </Button>
+        </div>
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <Label htmlFor="month" value="Month" />
@@ -336,21 +271,6 @@ export default function OvertimePanel({ overtimeEnabled }) {
             Load Report
           </Button>
 
-          {hasFetched && !locked && (
-            <Button
-              color="warning"
-              onClick={() => setShowFreezeModal(true)}
-            >
-              Salary Freeze
-            </Button>
-          )}
-
-          {hasFetched && locked && (
-            <Button color="failure" onClick={openUnfreezeModal}>
-              Unfreeze Salary
-            </Button>
-          )}
-
           {report.length > 0 && (
             <>
               <label className="flex items-center gap-2 text-sm pb-2">
@@ -376,7 +296,8 @@ export default function OvertimePanel({ overtimeEnabled }) {
 
         {locked && (
           <p className="mt-3 text-sm text-amber-600">
-            Salary for this month is frozen — no further changes are allowed.
+            Salary for this month is frozen — no further changes are allowed. Go
+            to the Salary page to unfreeze it first.
           </p>
         )}
       </Card>
@@ -393,7 +314,9 @@ export default function OvertimePanel({ overtimeEnabled }) {
         const deptDateKeys = dept.staff.flatMap((s) =>
           s.dates.map((d) => `${s.staffId}::${d.date}`),
         );
-        const deptSelectedCount = deptDateKeys.filter((k) => selected[k]).length;
+        const deptSelectedCount = deptDateKeys.filter(
+          (k) => selected[k],
+        ).length;
         const deptAllSelected =
           deptDateKeys.length > 0 && deptSelectedCount === deptDateKeys.length;
         const deptSomeSelected = deptSelectedCount > 0 && !deptAllSelected;
@@ -459,7 +382,11 @@ export default function OvertimePanel({ overtimeEnabled }) {
                                 checked={!!selected[key]}
                                 disabled={locked}
                                 onChange={(e) =>
-                                  toggleDate(s.staffId, d.date, e.target.checked)
+                                  toggleDate(
+                                    s.staffId,
+                                    d.date,
+                                    e.target.checked,
+                                  )
                                 }
                               />
                               <span className="font-medium">{d.date}</span>
@@ -515,118 +442,6 @@ export default function OvertimePanel({ overtimeEnabled }) {
           </Card>
         );
       })}
-
-      {/* Freeze confirmation modal */}
-      <Modal
-        show={showFreezeModal}
-        size="md"
-        onClose={() => setShowFreezeModal(false)}
-        popup
-      >
-        <Modal.Header />
-        <Modal.Body>
-          <div className="text-center">
-            <HiOutlineExclamationCircle className="mx-auto mb-4 h-14 w-14 text-amber-500" />
-            <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-              Freeze salary for {MONTH_NAMES[month - 1]} {year}?
-            </h3>
-            <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
-              Once frozen, salary calculation, advance salary changes,
-              conveyance edits, and overtime application will be locked for
-              this month. You can unfreeze it later with an OTP.
-            </p>
-            <div className="flex justify-center gap-3">
-              <Button color="gray" onClick={() => setShowFreezeModal(false)}>
-                Cancel
-              </Button>
-              <Button
-                color="warning"
-                onClick={confirmFreeze}
-                isProcessing={freezing}
-                disabled={freezing}
-              >
-                Yes, freeze it
-              </Button>
-            </div>
-          </div>
-        </Modal.Body>
-      </Modal>
-
-      {/* Unfreeze OTP modal */}
-      <Modal
-        show={showUnfreezeModal}
-        size="md"
-        onClose={() => setShowUnfreezeModal(false)}
-        popup
-      >
-        <Modal.Header />
-        <Modal.Body>
-          <div className="text-center">
-            <HiOutlineExclamationCircle className="mx-auto mb-4 h-14 w-14 text-red-500" />
-            <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-              Unfreeze salary for {MONTH_NAMES[month - 1]} {year}?
-            </h3>
-
-            {unfreezeStep === "request" ? (
-              <>
-                <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
-                  An OTP will be sent to your registered mobile number to
-                  confirm this action.
-                </p>
-                <div className="flex justify-center gap-3">
-                  <Button
-                    color="gray"
-                    onClick={() => setShowUnfreezeModal(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    color="failure"
-                    onClick={requestUnfreeze}
-                    isProcessing={unfreezing}
-                    disabled={unfreezing}
-                  >
-                    Send OTP
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
-                  Enter the OTP sent to {otpMobile || "your registered number"}.
-                </p>
-                <TextInput
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="6-digit OTP"
-                  value={otpValue}
-                  onChange={(e) => {
-                    if (/^\d*$/.test(e.target.value)) setOtpValue(e.target.value);
-                  }}
-                  className="mb-4"
-                />
-                <div className="flex justify-center gap-3">
-                  <Button
-                    color="gray"
-                    onClick={() => setShowUnfreezeModal(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    color="failure"
-                    onClick={confirmUnfreeze}
-                    isProcessing={unfreezing}
-                    disabled={unfreezing}
-                  >
-                    Verify & Unfreeze
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        </Modal.Body>
-      </Modal>
     </div>
   );
 }
