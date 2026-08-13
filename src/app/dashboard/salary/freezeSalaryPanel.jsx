@@ -1,25 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Card, Button, Select, Label, TextInput, Modal } from "flowbite-react";
+import { useState, useEffect } from "react";
+import { Card, Button, Select, Label, TextInput, Modal, Spinner } from "flowbite-react";
 import { HiOutlineExclamationCircle } from "react-icons/hi";
 import { RiTimeLine } from "react-icons/ri";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 
 const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
 
 function currentYearRange() {
@@ -34,7 +24,6 @@ export default function FreezeSalaryPanel() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
   const [locked, setLocked] = useState(false);
-  const [hasFetched, setHasFetched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [freezing, setFreezing] = useState(false);
 
@@ -46,11 +35,11 @@ export default function FreezeSalaryPanel() {
   const [otpMobile, setOtpMobile] = useState("");
   const [unfreezing, setUnfreezing] = useState(false);
 
-  async function fetchFreezeStatus() {
+  async function fetchFreezeStatus(m, y) {
     setLoading(true);
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/freeze-status?month=${month}&year=${year}`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/freeze-status?month=${m}&year=${y}`,
         { credentials: "include" },
       );
       const data = await res.json();
@@ -61,10 +50,15 @@ export default function FreezeSalaryPanel() {
       toast.error(error.message);
       setLocked(false);
     } finally {
-      setHasFetched(true);
       setLoading(false);
     }
   }
+
+  // Auto-fetch whenever month or year changes (including initial mount)
+  useEffect(() => {
+    fetchFreezeStatus(month, year);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month, year]);
 
   async function confirmFreeze() {
     setFreezing(true);
@@ -80,7 +74,7 @@ export default function FreezeSalaryPanel() {
         throw new Error(data?.errors || data?.message || "Failed to freeze salary");
       toast.success("Salary frozen successfully!");
       setShowFreezeModal(false);
-      fetchFreezeStatus();
+      fetchFreezeStatus(month, year);
       router.refresh();
     } catch (error) {
       toast.error(error.message);
@@ -143,7 +137,7 @@ export default function FreezeSalaryPanel() {
       setShowUnfreezeModal(false);
       setUnfreezeStep("request");
       setOtpValue("");
-      fetchFreezeStatus();
+      fetchFreezeStatus(month, year);
       router.refresh();
     } catch (error) {
       toast.error(error.message);
@@ -184,19 +178,18 @@ export default function FreezeSalaryPanel() {
           </Select>
         </div>
 
-        <Button onClick={fetchFreezeStatus} isProcessing={loading} disabled={loading}>
-          Check Status
-        </Button>
-
-        {hasFetched && !locked && (
-          <Button color="warning" onClick={() => setShowFreezeModal(true)}>
-            Salary Freeze
+        {loading ? (
+          <Button disabled>
+            <Spinner size="sm" className="mr-2" />
+            Loading...
           </Button>
-        )}
-
-        {hasFetched && locked && (
+        ) : locked ? (
           <Button color="failure" onClick={openUnfreezeModal}>
             Unfreeze Salary
+          </Button>
+        ) : (
+          <Button color="warning" onClick={() => setShowFreezeModal(true)}>
+            Salary Freeze
           </Button>
         )}
 
@@ -206,7 +199,7 @@ export default function FreezeSalaryPanel() {
         </Button>
       </div>
 
-      {hasFetched && (
+      {!loading && (
         <p className={`mt-3 text-sm ${locked ? "text-amber-600" : "text-gray-500"}`}>
           {locked
             ? `Salary for ${MONTH_NAMES[month - 1]} ${year} is frozen — no further changes are allowed.`
