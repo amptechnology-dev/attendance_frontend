@@ -16,7 +16,7 @@ export default function Component({ staffs = [] }) {
     let res;
     if (formData.get("staffId") === "all") {
       res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/slip-conv-ot/get-by-month`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/slip/get-by-month`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -26,7 +26,7 @@ export default function Component({ staffs = [] }) {
       );
     } else {
       res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/slip-conv-ot/get-by-staff`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/slip/get-by-staff`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -58,7 +58,7 @@ export default function Component({ staffs = [] }) {
   return (
     <Card className="">
       <h5 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-        Generate Pay Slip
+        Generate Pay Details
       </h5>
       <form onSubmit={handleSubmit}>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-3">

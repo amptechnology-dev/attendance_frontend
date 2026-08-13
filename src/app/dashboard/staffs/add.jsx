@@ -227,14 +227,14 @@ export default function Component() {
                     e.target.value = e.target.value.toUpperCase();
                   }}
                   maxLength={10}
-                  // required //TODO: Remove later
+                  
                 />
                 <FloatingLabel
                   variant="outlined"
                   label="Aadhaar Number"
                   type="number"
                   name="aadhaarNo"
-                  // required
+                  
                 />
                 <FloatingLabel
                   variant="outlined"
@@ -253,7 +253,7 @@ export default function Component() {
                   label="Monthly Salary"
                   type="number"
                   name="monthlySalary"
-                  required
+                  
                 />
                 <FloatingLabel
                   variant="outlined"
@@ -261,7 +261,7 @@ export default function Component() {
                   type="number"
                   name="overtimeRate"
                   defaultValue={200}
-                  required
+                  
                 />
                 <FloatingLabel
                   variant="outlined"
@@ -269,7 +269,7 @@ export default function Component() {
                   type="number"
                   name="allowedPaidLeaves"
                   defaultValue={paidLeaves}
-                  required
+                  
                 />
               </div>
               <div className="grid grid-cols-3 gap-4">
