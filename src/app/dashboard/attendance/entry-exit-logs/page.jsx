@@ -21,37 +21,49 @@ function buildLogsUrl(baseUrl, searchParams) {
 }
 
 export default async function Page({ searchParams }) {
-  const params = await searchParams; 
+  const params = await searchParams;
 
   const baseUrl = `${process.env.NEXT_PUBLIC_BACKEND_URI}/entry-exit-log/get`;
   const logsUrl = buildLogsUrl(baseUrl, params);
 
-  const fetchLogs = await fetchWithCookies(logsUrl).catch((error) => {
-    if (error.message === "Unauthorized") {
-      redirect("/auth/admin");
-    }
-    console.log(error);
-  });
-  const fetchStaffs = await fetchWithCookies(
-    `${process.env.NEXT_PUBLIC_BACKEND_URI}/admin/staff/get?status=active`
-  ).catch((error) => {
-    console.log(error);
-  });
-  const fetchDepartments = await fetchWithCookies(
-    `${process.env.NEXT_PUBLIC_BACKEND_URI}/admin/department/get`
-  ).catch((error) => {
-    console.log(error);
-  });
+  const [logsResult, staffsResult, departmentsResult] =
+    await Promise.allSettled([
+      fetchWithCookies(logsUrl),
+      fetchWithCookies(
+        `${process.env.NEXT_PUBLIC_BACKEND_URI}/admin/staff/get?status=active`,
+      ),
+      fetchWithCookies(
+        `${process.env.NEXT_PUBLIC_BACKEND_URI}/admin/department/get`,
+      ),
+    ]);
 
-  const logs = fetchLogs?.data;
-  const staffs = fetchStaffs?.data;
-  const departments = fetchDepartments?.data;
+  // Unauthorized হলে redirect
+  if (
+    logsResult.status === "rejected" &&
+    logsResult.reason?.message === "Unauthorized"
+  ) {
+    redirect("/auth/admin");
+  }
+
+  const logs =
+    logsResult.status === "fulfilled" ? logsResult.value?.data : undefined;
+  const staffs =
+    staffsResult.status === "fulfilled" ? staffsResult.value?.data : undefined;
+  const departments =
+    departmentsResult.status === "fulfilled"
+      ? departmentsResult.value?.data
+      : undefined;
+
+  if (logsResult.status === "rejected") console.log(logsResult.reason);
+  if (staffsResult.status === "rejected") console.log(staffsResult.reason);
+  if (departmentsResult.status === "rejected")
+    console.log(departmentsResult.reason);
 
   const filterLabel = params.startDate
     ? `${params.startDate} to ${params.endDate}`
     : params.date
-    ? params.date
-    : `Last ${params.days || 90} days`;
+      ? params.date
+      : `Last ${params.days || 90} days`;
 
   return (
     <div>
