@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Turnstile } from "@marsidev/react-turnstile";
 import Image from "next/image";
@@ -18,12 +18,9 @@ export default function Login() {
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState("password");
 
+  // Chrome/Edge autofill block trick — input readOnly রাখা হয়, focus হলে readOnly সরিয়ে দেওয়া হয়
   const [usernameReadOnly, setUsernameReadOnly] = useState(true);
   const [passwordReadOnly, setPasswordReadOnly] = useState(true);
-
-  useEffect(() => {
-    router.prefetch("/dashboard");
-  }, [router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -51,7 +48,7 @@ export default function Login() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, password }),
             credentials: "include",
-          },
+          }
         );
 
         const data = await res.json();
@@ -67,7 +64,6 @@ export default function Login() {
       } finally {
         setIsLoading(false);
       }
-      return;
     }
 
     if (step === "otp") {
@@ -85,7 +81,7 @@ export default function Login() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, otp }),
             credentials: "include",
-          },
+          }
         );
 
         const data = await res.json();
@@ -94,10 +90,10 @@ export default function Login() {
           router.push("/dashboard");
         } else {
           setError(data.message || "Invalid OTP");
-          setIsLoading(false);
         }
       } catch (error) {
         setError("An error occurred. Please try again.");
+      } finally {
         setIsLoading(false);
       }
     }
@@ -113,8 +109,10 @@ export default function Login() {
       }}
     >
       <div className="bg-white/98 backdrop-blur-sm p-7 sm:p-10 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 relative overflow-hidden">
+        {/* Decorative top accent */}
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600" />
 
+        {/* Logo */}
         <div className="flex justify-center mb-5">
           <Image
             src="/amp-logo.webp"
@@ -153,21 +151,15 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
-          <input
-            type="text"
-            name="fake-username"
-            className="hidden"
-            tabIndex={-1}
-            autoComplete="off"
-          />
-          <input
-            type="password"
-            name="fake-password"
-            className="hidden"
-            tabIndex={-1}
-            autoComplete="off"
-          />
+        {/* autoComplete="off" form-level + fake hidden fields Chrome-কে confuse করার জন্য */}
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-4"
+          autoComplete="off"
+        >
+          {/* Chrome/Safari autofill কে confuse করার জন্য hidden dummy fields */}
+          <input type="text" name="fake-username" className="hidden" tabIndex={-1} autoComplete="off" />
+          <input type="password" name="fake-password" className="hidden" tabIndex={-1} autoComplete="off" />
 
           {step === "password" && (
             <>
@@ -230,11 +222,7 @@ export default function Login() {
                     tabIndex={-1}
                     className="absolute inset-y-0 right-3.5 flex items-center text-gray-400 hover:text-gray-600 transition"
                   >
-                    {showPassword ? (
-                      <FaEyeSlash size={16} />
-                    ) : (
-                      <FaEye size={16} />
-                    )}
+                    {showPassword ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
                   </button>
                 </div>
               </div>
