@@ -124,7 +124,7 @@ export default function Login() {
         </div>
 
         <div className="text-center mb-7">
-          <h2 className="text-2xl font-bold text-white">Admin Portals</h2>
+          <h2 className="text-2xl font-bold text-white">Admin Portal</h2>
           <p className="text-sm text-white mt-1">
             {step === "password"
               ? "Sign in to your account"
