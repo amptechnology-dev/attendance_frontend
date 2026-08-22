@@ -44,7 +44,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
+    deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
@@ -55,9 +55,6 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
+          timeout: 60s
           command_timeout: 10m
           script: |
-            cd ~/attendance_frontend
-            docker compose pull
-            docker compose up -d
-            docker image prune -f
