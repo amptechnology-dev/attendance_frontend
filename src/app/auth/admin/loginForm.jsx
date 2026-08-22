@@ -18,8 +18,7 @@ export default function Login() {
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState("password");
 
-  // Chrome/Edge autofill block trick — input readOnly রাখা হয়, focus হলে readOnly সরিয়ে দেওয়া হয়
-  const [usernameReadOnly, setUsernameReadOnly] = useState(true);
+   const [usernameReadOnly, setUsernameReadOnly] = useState(true);
   const [passwordReadOnly, setPasswordReadOnly] = useState(true);
 
   const handleSubmit = async (e) => {
@@ -124,7 +123,7 @@ export default function Login() {
         </div>
 
         <div className="text-center mb-7">
-          <h2 className="text-2xl font-bold text-white">Admin Portal</h2>
+          <h2 className="text-2xl font-bold text-white">Attendance Portal</h2>
           <p className="text-sm text-white mt-1">
             {step === "password"
               ? "Sign in to your account"
