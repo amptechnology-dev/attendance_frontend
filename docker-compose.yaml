@@ -1,6 +1,6 @@
 services:
   app:
-    build: .
+    image: ghcr.io/amptechnology-dev/attendance_frontend:latest
     container_name: attendance-frontend
     restart: unless-stopped
     env_file:
@@ -9,7 +9,6 @@ services:
       - "3011"
     networks:
       - app-network
-
 networks:
   app-network:
     external: true
