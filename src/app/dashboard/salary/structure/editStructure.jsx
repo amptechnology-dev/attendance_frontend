@@ -8,6 +8,7 @@ import { RiSettings4Line } from "react-icons/ri";
 
 const DEFAULT_STRUCTURE = {
   grossSalary: { calculationType: "fixed" },
+  payableDays: { mode: "fixed" },
   basicSalary: { calculationType: "onGross", percentage: 50 },
   da: { enabled: false, percentage: 0 },
   overtime: { enabled: false, slotMinutes: 30, multiplier: 1.5 },
@@ -413,6 +414,29 @@ export default function EditStructure({ data = {} }) {
                 >
                   <option value="fixed">Fixed monthly salary</option>
                   <option value="perDay">No of days * Rate</option>
+                </Select>
+              </Field>
+            </Section>
+
+            {/* ---------- PAYABLE DAYS ---------- */}
+            <Section
+              title="Days in Month"
+              description="Salary calculation e per-day rate kon din diye bhag hobe"
+              toggle={null}
+            >
+              <Field label="Calculation days" htmlFor="payableDaysMode">
+                <Select
+                  id="payableDaysMode"
+                  value={form.payableDays.mode}
+                  onChange={(e) =>
+                    update("payableDays", "mode", e.target.value)
+                  }
+                  required
+                >
+                  <option value="fixed">Fixed — 30 days in every month</option>
+                  <option value="monthly">
+                    Monthly — actual din (28/29/30/31)
+                  </option>
                 </Select>
               </Field>
             </Section>

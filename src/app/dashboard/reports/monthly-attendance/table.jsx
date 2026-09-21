@@ -1,9 +1,11 @@
 "use client";
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { format } from "date-fns";
 import { Modal, Button, Badge, Select } from "flowbite-react";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
+import { minutesToHM } from "@/lib/helpers";
 
 const ADJUSTMENT_OPTIONS = {
   present: [
@@ -16,17 +18,26 @@ const ADJUSTMENT_OPTIONS = {
     { value: "Half-day to Full-day", label: "Half-day to Full-day" },
     { value: "Half-day to Absent", label: "Half-day to Absent" },
   ],
-  "full-day": [
-    { value: "Full-day to Absent", label: "Full-day to Absent" },
-  ],
+  "full-day": [{ value: "Full-day to Absent", label: "Full-day to Absent" }],
   absent: [
     { value: "Absent to Half-day", label: "Absent to Half-day" },
     { value: "Absent to Full-day", label: "Absent to Full-day" },
   ],
 };
 
-// FIX: এখন present, half-day, full-day, absent — চারটাই adjustable
+// present, half-day, full-day, absent — adjustable. week-off adjustable noy.
 const ADJUSTABLE_TYPES = ["present", "half-day", "full-day", "absent"];
+
+const POPOVER_WIDTH = 288;
+const POPOVER_EST_HEIGHT = 240;
+const HOVER_DELAY_MS = 200;
+
+// Week-off count: backend theke weekOffs ashle seta, na hole attendances theke count
+const getWeekOffCount = (staff) =>
+  staff.weekOffs ??
+  staff.attendances.filter((att) => att.status === "week-off").length;
+
+const fmtTime = (t) => (t ? format(new Date(t), "hh:mm a") : "—");
 
 export default function AttendanceTable({ data = [], days = [], month = "" }) {
   const reportRef = useRef();
@@ -36,6 +47,82 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
   const [statusModal, setStatusModal] = useState(null);
   const [rowSelections, setRowSelections] = useState(new Map());
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ---------- Hover popover (entry/exit logs) ----------
+  const hoverTimer = useRef(null);
+  const requestedRef = useRef(new Set()); // already fetched / in-flight attendance ids
+  const [hoverCard, setHoverCard] = useState(null);
+  // { [attendanceId]: { loading, error, logs } }
+  const [logsCache, setLogsCache] = useState({});
+
+  const loadLogs = async (record) => {
+    const id = record._id;
+
+    // Backend jodi `logs` populate kore pathay, tahole fetch lagbe na
+    if (
+      Array.isArray(record.logs) &&
+      record.logs.length > 0 &&
+      typeof record.logs[0] === "object"
+    ) {
+      setLogsCache((prev) => ({
+        ...prev,
+        [id]: { loading: false, error: null, logs: record.logs },
+      }));
+      return;
+    }
+
+    if (requestedRef.current.has(id)) return;
+    requestedRef.current.add(id);
+
+    setLogsCache((prev) => ({
+      ...prev,
+      [id]: { loading: true, error: null, logs: [] },
+    }));
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URI}/attendance/${id}/logs`,
+        { credentials: "include" },
+      );
+      if (!res.ok) throw new Error("Failed to load logs");
+      const json = await res.json();
+      setLogsCache((prev) => ({
+        ...prev,
+        [id]: { loading: false, error: null, logs: json.data || [] },
+      }));
+    } catch (err) {
+      requestedRef.current.delete(id); // next hover e abar try korbe
+      setLogsCache((prev) => ({
+        ...prev,
+        [id]: { loading: false, error: err.message, logs: [] },
+      }));
+    }
+  };
+
+  const handleCellEnter = (e, staff, record) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => {
+      setHoverCard({ record, staffName: staff.staffName, rect });
+      loadLogs(record);
+    }, HOVER_DELAY_MS);
+  };
+
+  const handleCellLeave = () => {
+    clearTimeout(hoverTimer.current);
+    setHoverCard(null);
+  };
+
+  const getPopoverStyle = (rect) => {
+    const left = Math.min(
+      Math.max(8, rect.left + rect.width / 2 - POPOVER_WIDTH / 2),
+      window.innerWidth - POPOVER_WIDTH - 8,
+    );
+    const openUp = rect.bottom + POPOVER_EST_HEIGHT > window.innerHeight;
+    return openUp
+      ? { left, top: rect.top - 6, width: POPOVER_WIDTH, transform: "translateY(-100%)" }
+      : { left, top: rect.bottom + 6, width: POPOVER_WIDTH };
+  };
 
   const isCurrentModalAdjustable =
     statusModal && ADJUSTABLE_TYPES.includes(statusModal.type);
@@ -92,6 +179,9 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
     } else if (type === "full-day") {
       records = staff.attendances.filter((att) => att.status === "full-day");
       typeLabel = "Full Day (FD)";
+    } else if (type === "week-off") {
+      records = staff.attendances.filter((att) => att.status === "week-off");
+      typeLabel = "Week Off (WO)";
     } else if (type === "ha") {
       records = staff.attendances.filter(
         (att) => att.hrAdjustment && att.hrAdjustment !== "None",
@@ -255,6 +345,8 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
     (v) => v.selected,
   ).length;
 
+  const hoverState = hoverCard ? logsCache[hoverCard.record._id] : null;
+
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -309,7 +401,10 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
               <strong className="text-gray-900">A</strong> : Absent
             </span>
             <span>
-              <strong className="text-gray-900">WO</strong> : Week Off
+              <strong className="text-red-600 border border-red-500 rounded-sm px-1">
+                WO
+              </strong>{" "}
+              : Week Off
             </span>
             <span>
               <strong className="text-gray-900">H</strong> : Holiday
@@ -339,7 +434,7 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
                     <tr>
                       <th
                         className="border border-gray-300 bg-slate-700 text-white text-sm font-semibold text-center"
-                        colSpan={days.length + 6}
+                        colSpan={days.length + 7}
                         style={{ padding: "10px 0" }}
                       >
                         {format(month, "MMMM yyyy")}
@@ -370,6 +465,9 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
                         A
                       </th>
                       <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
+                        WO
+                      </th>
+                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
                         HA
                       </th>
                     </tr>
@@ -398,7 +496,15 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
                           return (
                             <td
                               key={idx}
-                              className="border border-gray-300 p-0.5 text-center leading-tight align-middle"
+                              className={`border border-gray-300 p-0.5 text-center leading-tight align-middle ${
+                                record ? "cursor-help hover:bg-blue-50" : ""
+                              }`}
+                              onMouseEnter={
+                                record
+                                  ? (e) => handleCellEnter(e, staff, record)
+                                  : undefined
+                              }
+                              onMouseLeave={record ? handleCellLeave : undefined}
                             >
                               {record ? (
                                 <div>
@@ -411,7 +517,13 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
                                       format(record.exitTime, "hh:mmaaaaa")}
                                   </div>
                                   <div className="text-[10px] font-semibold">
-                                    {getStatusAbbreviation(record.status)}
+                                    {record.status === "week-off" ? (
+                                      <span className="inline-block border border-red-500 text-red-600 rounded-sm px-1 leading-tight">
+                                        WO
+                                      </span>
+                                    ) : (
+                                      getStatusAbbreviation(record.status)
+                                    )}
                                   </div>
                                 </div>
                               ) : (
@@ -450,6 +562,13 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
                         </td>
                         <td
                           className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
+                          onClick={() => openStatusModal(staff, "week-off")}
+                          title="Click to view Week Off dates"
+                        >
+                          {getWeekOffCount(staff)}
+                        </td>
+                        <td
+                          className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
                           onClick={() => openStatusModal(staff, "ha")}
                           title="Click to view existing HR adjustments"
                         >
@@ -464,6 +583,77 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
           ))}
         </div>
       </div>
+
+      {/* Hover popover: entry/exit logs of that day (portal, so overflow-x-auto clip korbe na) */}
+      {hoverCard &&
+        createPortal(
+          <div
+            className="fixed z-[9999] pointer-events-none rounded-lg border border-gray-200 bg-white shadow-xl text-xs"
+            style={getPopoverStyle(hoverCard.rect)}
+          >
+            <div className="flex items-center justify-between rounded-t-lg bg-slate-700 px-3 py-2 text-white">
+              <span className="font-semibold truncate pr-2">
+                {hoverCard.staffName}
+              </span>
+              <span className="whitespace-nowrap">
+                {format(new Date(hoverCard.record.date), "dd-MM-yyyy")}
+              </span>
+            </div>
+
+            <div className="px-3 py-2">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-gray-500">Status:</span>
+                {hoverCard.record.status === "week-off" ? (
+                  <span className="inline-block border border-red-500 text-red-600 rounded-sm px-1 font-semibold">
+                    WO
+                  </span>
+                ) : (
+                  <span className="font-semibold">
+                    {getStatusAbbreviation(hoverCard.record.status)}
+                  </span>
+                )}
+              </div>
+
+              {!hoverState || hoverState.loading ? (
+                <p className="text-gray-500">Loading logs...</p>
+              ) : hoverState.error ? (
+                <p className="text-red-600">Could not load logs.</p>
+              ) : hoverState.logs.length === 0 ? (
+                <p className="text-gray-500">No entry/exit log for this date.</p>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-left text-gray-500 border-b">
+                      <th className="py-1 pr-2 font-medium">#</th>
+                      <th className="py-1 pr-2 font-medium">In</th>
+                      <th className="py-1 pr-2 font-medium">Out</th>
+                      <th className="py-1 font-medium">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {hoverState.logs.map((log, i) => (
+                      <tr key={log._id || i} className="border-b last:border-0">
+                        <td className="py-1 pr-2">{log.slNo ?? i + 1}</td>
+                        <td className="py-1 pr-2">{fmtTime(log.entryTime)}</td>
+                        <td className="py-1 pr-2">
+                          {log.exitTime ? (
+                            fmtTime(log.exitTime)
+                          ) : (
+                            <span className="text-amber-600">Pending</span>
+                          )}
+                        </td>
+                        <td className="py-1">
+                          {log.exitTime ? minutesToHM(log.workingTime || 0) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {/* Status Detail + Adjustment Modal */}
       <Modal show={!!statusModal} onClose={closeStatusModal} size="2xl">
@@ -518,7 +708,13 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
                         {format(new Date(rec.date), "dd-MM-yyyy")}
                       </td>
                       <td className="p-2">
-                        {getStatusAbbreviation(rec.status)}
+                        {rec.status === "week-off" ? (
+                          <span className="inline-block border border-red-500 text-red-600 rounded-sm px-1 leading-tight">
+                            WO
+                          </span>
+                        ) : (
+                          getStatusAbbreviation(rec.status)
+                        )}
                         {rec.hrAdjustment && rec.hrAdjustment !== "None" && (
                           <span className="text-xs text-gray-500 block">
                             (currently: {rec.hrAdjustment})

@@ -70,7 +70,14 @@ export default async function SalaryStructure() {
                 : "Fixed Monthly Salary"}
             </TableCell>
           </TableRow>
-
+          <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
+            <TableCell>Days in Month</TableCell>
+            <TableCell>
+              {s?.payableDays?.mode === "monthly"
+                ? "Monthly — actual days of the month"
+                : "Fixed — 30 days every month"}
+            </TableCell>
+          </TableRow>
           <TableRow className="bg-white dark:border-gray-700 dark:bg-gray-800">
             <TableCell>Basic Salary</TableCell>
             <TableCell>
