@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, Button, Select, Label, TextInput, Modal, Spinner } from "flowbite-react";
+import { useState } from "react";
+import { Button, Select, Label, TextInput, Modal, Spinner } from "flowbite-react";
 import { HiOutlineExclamationCircle } from "react-icons/hi";
-import { RiTimeLine } from "react-icons/ri";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 
@@ -21,19 +20,17 @@ export default function FreezeSalaryPanel() {
   const now = new Date();
   const router = useRouter();
 
+  const [showModal, setShowModal] = useState(false);
+  const [step, setStep] = useState("picker"); // "picker" | "confirmFreeze" | "otpRequest" | "otpVerify"
+
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
   const [locked, setLocked] = useState(false);
   const [loading, setLoading] = useState(false);
   const [freezing, setFreezing] = useState(false);
-
-  const [showFreezeModal, setShowFreezeModal] = useState(false);
-
-  const [showUnfreezeModal, setShowUnfreezeModal] = useState(false);
-  const [unfreezeStep, setUnfreezeStep] = useState("request"); // "request" | "verify"
+  const [unfreezing, setUnfreezing] = useState(false);
   const [otpValue, setOtpValue] = useState("");
   const [otpMobile, setOtpMobile] = useState("");
-  const [unfreezing, setUnfreezing] = useState(false);
 
   async function fetchFreezeStatus(m, y) {
     setLoading(true);
@@ -54,11 +51,27 @@ export default function FreezeSalaryPanel() {
     }
   }
 
-  // Auto-fetch whenever month or year changes (including initial mount)
-  useEffect(() => {
-    fetchFreezeStatus(month, year);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month, year]);
+  function openModal() {
+    const m = now.getMonth() + 1;
+    const y = now.getFullYear();
+    setMonth(m);
+    setYear(y);
+    setStep("picker");
+    setShowModal(true);
+    fetchFreezeStatus(m, y);
+  }
+
+  function closeModal() {
+    setShowModal(false);
+    setStep("picker");
+    setOtpValue("");
+  }
+
+  function handleMonthYearChange(m, y) {
+    setMonth(m);
+    setYear(y);
+    fetchFreezeStatus(m, y);
+  }
 
   async function confirmFreeze() {
     setFreezing(true);
@@ -73,20 +86,13 @@ export default function FreezeSalaryPanel() {
       if (!res.ok)
         throw new Error(data?.errors || data?.message || "Failed to freeze salary");
       toast.success("Salary frozen successfully!");
-      setShowFreezeModal(false);
-      fetchFreezeStatus(month, year);
+      closeModal();
       router.refresh();
     } catch (error) {
       toast.error(error.message);
     } finally {
       setFreezing(false);
     }
-  }
-
-  function openUnfreezeModal() {
-    setUnfreezeStep("request");
-    setOtpValue("");
-    setShowUnfreezeModal(true);
   }
 
   async function requestUnfreeze() {
@@ -102,10 +108,9 @@ export default function FreezeSalaryPanel() {
         },
       );
       const data = await res.json();
-      if (!res.ok)
-        throw new Error(data?.errors || data?.message || "Failed to send OTP");
+      if (!res.ok) throw new Error(data?.errors || data?.message || "Failed to send OTP");
       setOtpMobile(data.data?.mobile || "");
-      setUnfreezeStep("verify");
+      setStep("otpVerify");
       toast.success("OTP sent to your registered mobile number.");
     } catch (error) {
       toast.error(error.message);
@@ -131,13 +136,9 @@ export default function FreezeSalaryPanel() {
         },
       );
       const data = await res.json();
-      if (!res.ok)
-        throw new Error(data?.errors || data?.message || "Failed to verify OTP");
+      if (!res.ok) throw new Error(data?.errors || data?.message || "Failed to verify OTP");
       toast.success("Salary unfrozen successfully!");
-      setShowUnfreezeModal(false);
-      setUnfreezeStep("request");
-      setOtpValue("");
-      fetchFreezeStatus(month, year);
+      closeModal();
       router.refresh();
     } catch (error) {
       toast.error(error.message);
@@ -147,160 +148,151 @@ export default function FreezeSalaryPanel() {
   }
 
   return (
-    <Card className="mb-5">
-      <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <Label htmlFor="freezeMonth" value="Month" />
-          <Select
-            id="freezeMonth"
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-          >
-            {MONTH_NAMES.map((name, i) => (
-              <option key={name} value={i + 1}>
-                {name}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="freezeYear" value="Year" />
-          <Select
-            id="freezeYear"
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-          >
-            {currentYearRange().map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </Select>
-        </div>
+    <>
+      <Button color="warning" onClick={openModal}>
+        Salary Freeze
+      </Button>
 
-        {loading ? (
-          <Button disabled>
-            <Spinner size="sm" className="mr-2" />
-            Loading...
-          </Button>
-        ) : locked ? (
-          <Button color="failure" onClick={openUnfreezeModal}>
-            Unfreeze Salary
-          </Button>
-        ) : (
-          <Button color="warning" onClick={() => setShowFreezeModal(true)}>
-            Salary Freeze
-          </Button>
-        )}
-
-        <Button color="light" onClick={() => router.push("/dashboard/salary/overtime")}>
-          <RiTimeLine className="mr-2 h-5 w-5" />
-          Overtime
-        </Button>
-      </div>
-
-      {!loading && (
-        <p className={`mt-3 text-sm ${locked ? "text-amber-600" : "text-gray-500"}`}>
-          {locked
-            ? `Salary for ${MONTH_NAMES[month - 1]} ${year} is frozen — no further changes are allowed.`
-            : `Salary for ${MONTH_NAMES[month - 1]} ${year} is not frozen yet.`}
-        </p>
-      )}
-
-      {/* Freeze confirmation modal */}
-      <Modal show={showFreezeModal} size="md" onClose={() => setShowFreezeModal(false)} popup>
+      <Modal show={showModal} size="md" onClose={closeModal} popup>
         <Modal.Header />
         <Modal.Body>
-          <div className="text-center">
-            <HiOutlineExclamationCircle className="mx-auto mb-4 h-14 w-14 text-amber-500" />
-            <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-              Freeze salary for {MONTH_NAMES[month - 1]} {year}?
-            </h3>
-            <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
-              Once frozen, salary calculation, advance salary changes, conveyance edits,
-              overtime application, and bonus changes will be locked for this month. You can
-              unfreeze it later with an OTP.
-            </p>
-            <div className="flex justify-center gap-3">
-              <Button color="gray" onClick={() => setShowFreezeModal(false)}>
-                Cancel
-              </Button>
-              <Button
-                color="warning"
-                onClick={confirmFreeze}
-                isProcessing={freezing}
-                disabled={freezing}
-              >
-                Yes, freeze it
-              </Button>
+          {step === "picker" && (
+            <div>
+              <h3 className="mb-4 text-center text-lg font-semibold text-gray-900 dark:text-white">
+                Freeze / Unfreeze Salary
+              </h3>
+              <div className="mb-4 flex gap-3">
+                <div className="flex-1">
+                  <Label htmlFor="freezeMonth" value="Month" />
+                  <Select
+                    id="freezeMonth"
+                    value={month}
+                    onChange={(e) => handleMonthYearChange(Number(e.target.value), year)}
+                  >
+                    {MONTH_NAMES.map((name, i) => (
+                      <option key={name} value={i + 1}>{name}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="flex-1">
+                  <Label htmlFor="freezeYear" value="Year" />
+                  <Select
+                    id="freezeYear"
+                    value={year}
+                    onChange={(e) => handleMonthYearChange(month, Number(e.target.value))}
+                  >
+                    {currentYearRange().map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="flex justify-center py-3">
+                  <Spinner size="md" />
+                </div>
+              ) : (
+                <>
+                  <p
+                    className={`mb-4 text-center text-sm ${
+                      locked ? "text-amber-600" : "text-gray-500"
+                    }`}
+                  >
+                    {locked
+                      ? `Salary for ${MONTH_NAMES[month - 1]} ${year} is frozen — no further changes are allowed.`
+                      : `Salary for ${MONTH_NAMES[month - 1]} ${year} is not frozen yet.`}
+                  </p>
+                  <div className="flex justify-center">
+                    {locked ? (
+                      <Button color="failure" onClick={() => setStep("otpRequest")}>
+                        Unfreeze Salary
+                      </Button>
+                    ) : (
+                      <Button color="warning" onClick={() => setStep("confirmFreeze")}>
+                        Freeze Salary
+                      </Button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
-          </div>
+          )}
+
+          {step === "confirmFreeze" && (
+            <div className="text-center">
+              <HiOutlineExclamationCircle className="mx-auto mb-4 h-14 w-14 text-amber-500" />
+              <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+                Freeze salary for {MONTH_NAMES[month - 1]} {year}?
+              </h3>
+              <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
+                Once frozen, salary calculation, advance salary changes, conveyance edits,
+                overtime application, and bonus changes will be locked for this month. You can
+                unfreeze it later with an OTP.
+              </p>
+              <div className="flex justify-center gap-3">
+                <Button color="gray" onClick={() => setStep("picker")}>
+                  Cancel
+                </Button>
+                <Button color="warning" onClick={confirmFreeze} isProcessing={freezing} disabled={freezing}>
+                  Yes, freeze it
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === "otpRequest" && (
+            <div className="text-center">
+              <HiOutlineExclamationCircle className="mx-auto mb-4 h-14 w-14 text-red-500" />
+              <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+                Unfreeze salary for {MONTH_NAMES[month - 1]} {year}?
+              </h3>
+              <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
+                An OTP will be sent to your registered mobile number to confirm this action.
+              </p>
+              <div className="flex justify-center gap-3">
+                <Button color="gray" onClick={() => setStep("picker")}>
+                  Cancel
+                </Button>
+                <Button color="failure" onClick={requestUnfreeze} isProcessing={unfreezing} disabled={unfreezing}>
+                  Send OTP
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === "otpVerify" && (
+            <div className="text-center">
+              <HiOutlineExclamationCircle className="mx-auto mb-4 h-14 w-14 text-red-500" />
+              <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+                Unfreeze salary for {MONTH_NAMES[month - 1]} {year}?
+              </h3>
+              <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+                Enter the OTP sent to {otpMobile || "your registered number"}.
+              </p>
+              <TextInput
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="6-digit OTP"
+                value={otpValue}
+                onChange={(e) => {
+                  if (/^\d*$/.test(e.target.value)) setOtpValue(e.target.value);
+                }}
+                className="mb-4"
+              />
+              <div className="flex justify-center gap-3">
+                <Button color="gray" onClick={() => setStep("picker")}>
+                  Cancel
+                </Button>
+                <Button color="failure" onClick={confirmUnfreeze} isProcessing={unfreezing} disabled={unfreezing}>
+                  Verify & Unfreeze
+                </Button>
+              </div>
+            </div>
+          )}
         </Modal.Body>
       </Modal>
-
-      {/* Unfreeze OTP modal */}
-      <Modal show={showUnfreezeModal} size="md" onClose={() => setShowUnfreezeModal(false)} popup>
-        <Modal.Header />
-        <Modal.Body>
-          <div className="text-center">
-            <HiOutlineExclamationCircle className="mx-auto mb-4 h-14 w-14 text-red-500" />
-            <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-              Unfreeze salary for {MONTH_NAMES[month - 1]} {year}?
-            </h3>
-
-            {unfreezeStep === "request" ? (
-              <>
-                <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
-                  An OTP will be sent to your registered mobile number to confirm this action.
-                </p>
-                <div className="flex justify-center gap-3">
-                  <Button color="gray" onClick={() => setShowUnfreezeModal(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    color="failure"
-                    onClick={requestUnfreeze}
-                    isProcessing={unfreezing}
-                    disabled={unfreezing}
-                  >
-                    Send OTP
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
-                  Enter the OTP sent to {otpMobile || "your registered number"}.
-                </p>
-                <TextInput
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="6-digit OTP"
-                  value={otpValue}
-                  onChange={(e) => {
-                    if (/^\d*$/.test(e.target.value)) setOtpValue(e.target.value);
-                  }}
-                  className="mb-4"
-                />
-                <div className="flex justify-center gap-3">
-                  <Button color="gray" onClick={() => setShowUnfreezeModal(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    color="failure"
-                    onClick={confirmUnfreeze}
-                    isProcessing={unfreezing}
-                    disabled={unfreezing}
-                  >
-                    Verify & Unfreeze
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        </Modal.Body>
-      </Modal>
-    </Card>
+    </>
   );
 }

@@ -1,8 +1,6 @@
-import TabsWithDatatable from "./tabs";
+import SalaryPageClient from "./salaryPageClient";
 import { fetchWithCookies } from "@/lib/fetchWithCookies";
 import { redirect } from "next/navigation";
-import CalculateSalaryButton from "./calculateSalaryButton";
-import FreezeSalaryPanel from "./freezeSalaryPanel";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -14,25 +12,19 @@ export default async function Page() {
   const fetchAllSalary = await fetchWithCookies(
     `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/get/past-months?months=3`,
   ).catch((error) => {
-    if (error.message === "Unauthorized") {
-      redirect("/auth/admin");
-    }
+    if (error.message === "Unauthorized") redirect("/auth/admin");
     console.log(error);
   });
   const fetchPreviousMonthSalary = await fetchWithCookies(
     `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/get/previous-month`,
   ).catch((error) => {
-    if (error.message === "Unauthorized") {
-      redirect("/auth/admin");
-    }
+    if (error.message === "Unauthorized") redirect("/auth/admin");
     console.log(error);
   });
   const fetchSalaryStructure = await fetchWithCookies(
     `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/structure/get`,
   ).catch((error) => {
-    if (error.message === "Unauthorized") {
-      redirect("/auth/admin");
-    }
+    if (error.message === "Unauthorized") redirect("/auth/admin");
     console.log(error);
   });
 
@@ -40,17 +32,20 @@ export default async function Page() {
   const previousMonthSalary = fetchPreviousMonthSalary?.data;
   const officeSalaryStructure = fetchSalaryStructure?.data;
 
+  // server-এ "previous month" কত, সেটা client-এর initial select value হিসেবে পাঠানো হচ্ছে
+  const now = new Date();
+  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const previousMonthInitial = {
+    month: prevDate.getMonth() + 1,
+    year: prevDate.getFullYear(),
+  };
+
   return (
-    <div>
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <CalculateSalaryButton />
-      </div>
-      <FreezeSalaryPanel />
-      <TabsWithDatatable
-        allSalaryData={allSalaryData}
-        previousMonthSalary={previousMonthSalary}
-        officeSalaryStructure={officeSalaryStructure}
-      />
-    </div>
+    <SalaryPageClient
+      allSalaryData={allSalaryData}
+      previousMonthSalary={previousMonthSalary}
+      previousMonthInitial={previousMonthInitial}
+      officeSalaryStructure={officeSalaryStructure}
+    />
   );
 }

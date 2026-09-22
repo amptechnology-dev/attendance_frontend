@@ -435,7 +435,7 @@ export default function EditStructure({ data = {} }) {
                 >
                   <option value="fixed">Fixed — 30 days in every month</option>
                   <option value="monthly">
-                    Monthly — actual din (28/29/30/31)
+                    Monthly — Calculated Based on the Actual Number of Days in the Month (28, 29, 30, or 31)
                   </option>
                 </Select>
               </Field>

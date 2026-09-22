@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, Button, Select, Label, TextInput, Radio } from "flowbite-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ShowTable from "./table";
 // import ExportButtons from "./exportReport";
 // import { LimitDropDown } from "@/app/dashboard/components/LimitDropDown";
@@ -13,6 +13,28 @@ export default function Component() {
   const [month, setMonth] = useState("");
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [dutyTimings, setDutyTimings] = useState([]);
+
+  // Half-day policy (per department) — ekbar mount hoile fetch hobe
+  useEffect(() => {
+    const fetchDutyTimings = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URI}/admin/duty-timing/get`,
+          { credentials: "include" }
+        );
+        if (res.ok) {
+          const json = await res.json();
+          setDutyTimings(json.data || []);
+        } else {
+          console.error("duty-timing/get failed:", res.status);
+        }
+      } catch (err) {
+        console.error("Failed to load duty timings:", err);
+      }
+    };
+    fetchDutyTimings();
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -86,7 +108,7 @@ export default function Component() {
             {/* {data?.report?.length > 0 && <ExportButtons params={params} />} */}
           </div>
         </div>
-        <ShowTable data={data} days={days} month={month} />
+        <ShowTable data={data} days={days} month={month} dutyTimings={dutyTimings} />
       </div>
     </>
   );

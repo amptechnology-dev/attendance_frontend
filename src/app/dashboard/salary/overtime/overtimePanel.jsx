@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   Button,
@@ -51,11 +51,15 @@ function TriStateCheckbox({ checked, indeterminate, onChange, disabled }) {
   );
 }
 
-export default function OvertimePanel({ overtimeEnabled }) {
-  const router = useRouter();
+export default function OvertimePanel({
+  overtimeEnabled,
+  initialMonth,
+  initialYear,
+  onBack,
+}) {
   const now = new Date();
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(initialMonth ?? now.getMonth() + 1);
+  const [year, setYear] = useState(initialYear ?? now.getFullYear());
   const [report, setReport] = useState([]);
   const [locked, setLocked] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
@@ -118,6 +122,10 @@ export default function OvertimePanel({ overtimeEnabled }) {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    fetchReport();
+  }, []);
 
   function toggleDate(staffId, date, value) {
     setSelected((prev) => ({ ...prev, [`${staffId}::${date}`]: value }));
@@ -204,12 +212,7 @@ export default function OvertimePanel({ overtimeEnabled }) {
   if (!overtimeEnabled) {
     return (
       <Card>
-        <Button
-          color="light"
-          size="sm"
-          onClick={() => router.push("/dashboard/salary")}
-          className="mb-3"
-        >
+        <Button color="light" size="sm" onClick={onBack} className="mb-3">
           <RiArrowLeftLine className="mr-2 h-4 w-4" />
           Back to Salary
         </Button>
@@ -225,11 +228,7 @@ export default function OvertimePanel({ overtimeEnabled }) {
     <div className="space-y-4">
       <Card>
         <div className="flex items-center justify-between mb-2">
-          <Button
-            color="light"
-            size="sm"
-            onClick={() => router.push("/dashboard/salary")}
-          >
+          <Button color="light" size="sm" onClick={onBack}>
             <RiArrowLeftLine className="mr-2 h-4 w-4" />
             Back to Salary
           </Button>

@@ -305,8 +305,7 @@ export default function Component({ staffs = [], departments = [] }) {
                   </div>
                 )}
                 <p className="text-xs text-gray-500 mt-1">
-                  Ei mash gulote deduction hobe na (bonus month, ba onno
-                  karone). Baki mash normal cholbe.
+                  There will be no deduction in these months (bonus month, or for other reasons). The rest of the months will run normally.
                 </p>
               </div>
 

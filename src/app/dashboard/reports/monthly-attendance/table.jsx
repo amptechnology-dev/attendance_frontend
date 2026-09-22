@@ -39,7 +39,17 @@ const getWeekOffCount = (staff) =>
 
 const fmtTime = (t) => (t ? format(new Date(t), "hh:mm a") : "—");
 
-export default function AttendanceTable({ data = [], days = [], month = "" }) {
+// duty-timing.department kokhono populated object ({_id, name}) abar kokhono
+// শুধু ObjectId string hoy — dutorokom case-i handle kora hocche eikhane
+const extractDeptId = (deptField) =>
+  deptField && typeof deptField === "object" ? deptField._id : deptField;
+
+export default function AttendanceTable({
+  data = [],
+  days = [],
+  month = "",
+  dutyTimings = [],
+}) {
   const reportRef = useRef();
   const [isGenerating, setIsGenerating] = useState(false);
   const router = useRouter();
@@ -54,6 +64,14 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
   const [hoverCard, setHoverCard] = useState(null);
   // { [attendanceId]: { loading, error, logs } }
   const [logsCache, setLogsCache] = useState({});
+
+  // Department id diye matching duty-timing theke halfDayAllowed ber kora
+  const getDeptHalfDayAllowed = (deptId) => {
+    const match = dutyTimings.find(
+      (t) => String(extractDeptId(t.department)) === String(deptId),
+    );
+    return match?.halfDayAllowed;
+  };
 
   const loadLogs = async (record) => {
     const id = record._id;
@@ -120,7 +138,12 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
     );
     const openUp = rect.bottom + POPOVER_EST_HEIGHT > window.innerHeight;
     return openUp
-      ? { left, top: rect.top - 6, width: POPOVER_WIDTH, transform: "translateY(-100%)" }
+      ? {
+          left,
+          top: rect.top - 6,
+          width: POPOVER_WIDTH,
+          transform: "translateY(-100%)",
+        }
       : { left, top: rect.bottom + 6, width: POPOVER_WIDTH };
   };
 
@@ -414,173 +437,193 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
             </span>
           </div>
 
-          {data?.map((dept, deptIdx) => (
-            <div
-              key={dept._id}
-              className={`dept-block ${deptIdx > 0 ? "dept-block-break" : ""}`}
-            >
-              <div className="mb-2 flex items-center justify-between border-b-2 border-blue-600 pb-1">
-                <h2 className="text-base font-bold text-gray-900">
-                  Attendance Report
-                </h2>
-                <span className="text-sm font-semibold text-blue-700">
-                  {dept.departmentName} &middot; {format(month, "MMMM yyyy")}
-                </span>
-              </div>
+          {data?.map((dept, deptIdx) => {
+            const halfDayAllowed = getDeptHalfDayAllowed(dept._id);
+            const hasHalfDayRule =
+              halfDayAllowed !== undefined &&
+              halfDayAllowed !== null &&
+              halfDayAllowed !== "" &&
+              Number(halfDayAllowed) > 0;
 
-              <div className="overflow-x-auto border border-gray-300 rounded-md">
-                <table className="border-collapse text-xs w-full">
-                  <thead>
-                    <tr>
-                      <th
-                        className="border border-gray-300 bg-slate-700 text-white text-sm font-semibold text-center"
-                        colSpan={days.length + 7}
-                        style={{ padding: "10px 0" }}
-                      >
-                        {format(month, "MMMM yyyy")}
-                      </th>
-                    </tr>
-                    <tr>
-                      <th className="border border-gray-300 p-2 sticky left-0 bg-slate-700 text-white z-10 text-sm whitespace-nowrap">
-                        Staff
-                      </th>
-                      {days.map((d, idx) => (
+            return (
+              <div
+                key={dept._id}
+                className={`dept-block ${deptIdx > 0 ? "dept-block-break" : ""}`}
+              >
+                <div className="mb-2 flex items-center justify-between border-b-2 border-blue-600 pb-1">
+                  <h2 className="text-base font-bold text-gray-900">
+                    Attendance Report
+                  </h2>
+                  <span className="text-sm font-semibold text-blue-700">
+                    {dept.departmentName} &middot; {format(month, "MMMM yyyy")}
+                  </span>
+                </div>
+
+                {hasHalfDayRule && (
+                  <p className="mb-2 text-xs italic text-gray-600 bg-yellow-50 border border-yellow-200 rounded px-2 py-1">
+                    Note: For <strong>{dept.departmentName}</strong>,{" "}
+                    <strong>{halfDayAllowed}</strong> Half-day
+                    {Number(halfDayAllowed) !== 1 ? "s" : ""} will be treated
+                    as <strong>{halfDayAllowed} Full-day</strong>.
+                  </p>
+                )}
+
+                <div className="overflow-x-auto border border-gray-300 rounded-md">
+                  <table className="border-collapse text-xs w-full">
+                    <thead>
+                      <tr>
                         <th
-                          key={idx}
-                          className="border border-gray-300 p-1 bg-slate-200 text-xs align-middle w-[28px]"
+                          className="border border-gray-300 bg-slate-700 text-white text-sm font-semibold text-center"
+                          colSpan={days.length + 7}
+                          style={{ padding: "10px 0" }}
                         >
-                          {d.getDate()}
+                          {format(month, "MMMM yyyy")}
                         </th>
-                      ))}
-                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
-                        FD
-                      </th>
-                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
-                        HD
-                      </th>
-                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
-                        P
-                      </th>
-                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
-                        A
-                      </th>
-                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
-                        WO
-                      </th>
-                      <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
-                        HA
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dept.staffReports.map((staff, staffIdx) => (
-                      <tr
-                        key={staff.staffId}
-                        className={
-                          staffIdx % 2 === 0 ? "bg-white" : "bg-gray-50"
-                        }
-                      >
-                        <td className="border border-gray-300 p-1.5 sticky left-0 bg-inherit whitespace-nowrap text-xs font-medium align-middle">
-                          {staff.staffName}
-                          <p className="text-[10px] text-gray-500 font-normal">
-                            {staff.staffId || "-"}
-                          </p>
-                        </td>
-                        {days.map((d, idx) => {
-                          const record = staff.attendances.find(
-                            (att) =>
-                              new Date(att.date).getDate() === d.getDate() &&
-                              new Date(att.date).getMonth() === d.getMonth(),
-                          );
-
-                          return (
-                            <td
-                              key={idx}
-                              className={`border border-gray-300 p-0.5 text-center leading-tight align-middle ${
-                                record ? "cursor-help hover:bg-blue-50" : ""
-                              }`}
-                              onMouseEnter={
-                                record
-                                  ? (e) => handleCellEnter(e, staff, record)
-                                  : undefined
-                              }
-                              onMouseLeave={record ? handleCellLeave : undefined}
-                            >
-                              {record ? (
-                                <div>
-                                  <div className="text-[9px] text-gray-500">
-                                    {record.entryTime &&
-                                      format(record.entryTime, "hh:mmaaaaa")}
-                                  </div>
-                                  <div className="text-[9px] text-gray-500">
-                                    {record.exitTime &&
-                                      format(record.exitTime, "hh:mmaaaaa")}
-                                  </div>
-                                  <div className="text-[10px] font-semibold">
-                                    {record.status === "week-off" ? (
-                                      <span className="inline-block border border-red-500 text-red-600 rounded-sm px-1 leading-tight">
-                                        WO
-                                      </span>
-                                    ) : (
-                                      getStatusAbbreviation(record.status)
-                                    )}
-                                  </div>
-                                </div>
-                              ) : (
-                                " "
-                              )}
-                            </td>
-                          );
-                        })}
-                        <td
-                          className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
-                          onClick={() => openStatusModal(staff, "full-day")}
-                          title="Click to view & adjust Full Day dates"
-                        >
-                          {staff.fullDays}
-                        </td>
-                        <td
-                          className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
-                          onClick={() => openStatusModal(staff, "half-day")}
-                          title="Click to view & adjust Half Day dates"
-                        >
-                          {staff.halfDays}
-                        </td>
-                        <td
-                          className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
-                          onClick={() => openStatusModal(staff, "present")}
-                          title="Click to view & adjust Present dates"
-                        >
-                          {staff.presents}
-                        </td>
-                        <td
-                          className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
-                          onClick={() => openStatusModal(staff, "absent")}
-                          title="Click to view & adjust Absent dates"
-                        >
-                          {staff.absents}
-                        </td>
-                        <td
-                          className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
-                          onClick={() => openStatusModal(staff, "week-off")}
-                          title="Click to view Week Off dates"
-                        >
-                          {getWeekOffCount(staff)}
-                        </td>
-                        <td
-                          className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
-                          onClick={() => openStatusModal(staff, "ha")}
-                          title="Click to view existing HR adjustments"
-                        >
-                          {staff.hrAdjustments}
-                        </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                      <tr>
+                        <th className="border border-gray-300 p-2 sticky left-0 bg-slate-700 text-white z-10 text-sm whitespace-nowrap">
+                          Staff
+                        </th>
+                        {days.map((d, idx) => (
+                          <th
+                            key={idx}
+                            className="border border-gray-300 p-1 bg-slate-200 text-xs align-middle w-[28px]"
+                          >
+                            {d.getDate()}
+                          </th>
+                        ))}
+                        <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
+                          FD
+                        </th>
+                        <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
+                          HD
+                        </th>
+                        <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
+                          P
+                        </th>
+                        <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
+                          A
+                        </th>
+                        <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
+                          WO
+                        </th>
+                        <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
+                          HA
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dept.staffReports.map((staff, staffIdx) => (
+                        <tr
+                          key={staff.staffId}
+                          className={
+                            staffIdx % 2 === 0 ? "bg-white" : "bg-gray-50"
+                          }
+                        >
+                          <td className="border border-gray-300 p-1.5 sticky left-0 bg-inherit whitespace-nowrap text-xs font-medium align-middle">
+                            {staff.staffName}
+                            <p className="text-[10px] text-gray-500 font-normal">
+                              {staff.staffId || "-"}
+                            </p>
+                          </td>
+                          {days.map((d, idx) => {
+                            const record = staff.attendances.find(
+                              (att) =>
+                                new Date(att.date).getDate() === d.getDate() &&
+                                new Date(att.date).getMonth() === d.getMonth(),
+                            );
+
+                            return (
+                              <td
+                                key={idx}
+                                className={`border border-gray-300 p-0.5 text-center leading-tight align-middle ${
+                                  record ? "cursor-help hover:bg-blue-50" : ""
+                                }`}
+                                onMouseEnter={
+                                  record
+                                    ? (e) => handleCellEnter(e, staff, record)
+                                    : undefined
+                                }
+                                onMouseLeave={
+                                  record ? handleCellLeave : undefined
+                                }
+                              >
+                                {record ? (
+                                  <div>
+                                    <div className="text-[9px] text-gray-500">
+                                      {record.entryTime &&
+                                        format(record.entryTime, "hh:mmaaaaa")}
+                                    </div>
+                                    <div className="text-[9px] text-gray-500">
+                                      {record.exitTime &&
+                                        format(record.exitTime, "hh:mmaaaaa")}
+                                    </div>
+                                    <div className="text-[10px] font-semibold">
+                                      {record.status === "week-off" ? (
+                                        <span className="inline-block border border-red-500 text-red-600 rounded-sm px-1 leading-tight">
+                                          WO
+                                        </span>
+                                      ) : (
+                                        getStatusAbbreviation(record.status)
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  " "
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td
+                            className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
+                            onClick={() => openStatusModal(staff, "full-day")}
+                            title="Click to view & adjust Full Day dates"
+                          >
+                            {staff.fullDays}
+                          </td>
+                          <td
+                            className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
+                            onClick={() => openStatusModal(staff, "half-day")}
+                            title="Click to view & adjust Half Day dates"
+                          >
+                            {staff.halfDays}
+                          </td>
+                          <td
+                            className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
+                            onClick={() => openStatusModal(staff, "present")}
+                            title="Click to view & adjust Present dates"
+                          >
+                            {staff.presents}
+                          </td>
+                          <td
+                            className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
+                            onClick={() => openStatusModal(staff, "absent")}
+                            title="Click to view & adjust Absent dates"
+                          >
+                            {staff.absents}
+                          </td>
+                          <td
+                            className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
+                            onClick={() => openStatusModal(staff, "week-off")}
+                            title="Click to view Week Off dates"
+                          >
+                            {getWeekOffCount(staff)}
+                          </td>
+                          <td
+                            className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
+                            onClick={() => openStatusModal(staff, "ha")}
+                            title="Click to view existing HR adjustments"
+                          >
+                            {staff.hrAdjustments}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -619,7 +662,9 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
               ) : hoverState.error ? (
                 <p className="text-red-600">Could not load logs.</p>
               ) : hoverState.logs.length === 0 ? (
-                <p className="text-gray-500">No entry/exit log for this date.</p>
+                <p className="text-gray-500">
+                  No entry/exit log for this date.
+                </p>
               ) : (
                 <table className="w-full">
                   <thead>
@@ -643,7 +688,9 @@ export default function AttendanceTable({ data = [], days = [], month = "" }) {
                           )}
                         </td>
                         <td className="py-1">
-                          {log.exitTime ? minutesToHM(log.workingTime || 0) : "—"}
+                          {log.exitTime
+                            ? minutesToHM(log.workingTime || 0)
+                            : "—"}
                         </td>
                       </tr>
                     ))}
