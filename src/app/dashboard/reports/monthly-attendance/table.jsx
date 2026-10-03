@@ -32,6 +32,9 @@ const POPOVER_WIDTH = 288;
 const POPOVER_EST_HEIGHT = 240;
 const HOVER_DELAY_MS = 200;
 
+// Staff name column er max width (er beshi hole niche wrap hobe)
+const NAME_MAX_WIDTH = 120;
+
 // Week-off count: backend theke weekOffs ashle seta, na hole attendances theke count
 const getWeekOffCount = (staff) =>
   staff.weekOffs ??
@@ -43,6 +46,12 @@ const fmtTime = (t) => (t ? format(new Date(t), "hh:mm a") : "—");
 // শুধু ObjectId string hoy — dutorokom case-i handle kora hocche eikhane
 const extractDeptId = (deptField) =>
   deptField && typeof deptField === "object" ? deptField._id : deptField;
+
+// Summary (FD/HD/P/A/WO/HA) column er common class — choto font, kom padding
+const SUMMARY_TH =
+  "border border-gray-300 px-0.5 py-1 bg-blue-100 text-[10px] align-middle font-bold w-[22px] min-w-[22px] text-center";
+const SUMMARY_TD =
+  "border border-gray-300 px-0.5 py-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle text-[10px] w-[22px] min-w-[22px]";
 
 export default function AttendanceTable({
   data = [],
@@ -57,6 +66,7 @@ export default function AttendanceTable({
   const [statusModal, setStatusModal] = useState(null);
   const [rowSelections, setRowSelections] = useState(new Map());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bulkAdjustment, setBulkAdjustment] = useState("");
 
   // ---------- Hover popover (entry/exit logs) ----------
   const hoverTimer = useRef(null);
@@ -151,40 +161,136 @@ export default function AttendanceTable({
     statusModal && ADJUSTABLE_TYPES.includes(statusModal.type);
 
   const handleDownload = async () => {
-    setIsGenerating(true);
-    try {
-      const html2pdf = (await import("html2pdf.js")).default;
-      const element = reportRef.current;
+  setIsGenerating(true);
 
-      const opt = {
-        margin: 0.3,
-        filename: "attendance-report.pdf",
-        html2canvas: {
-          scale: 3,
-          useCORS: true,
-          windowWidth: element.scrollWidth,
-          windowHeight: element.scrollHeight,
-        },
-        jsPDF: { unit: "in", format: "legal", orientation: "landscape" },
-        pagebreak: {
-          mode: ["css"],
-          before: ".dept-block-break",
-          avoid: ["tr"],
-        },
-      };
+  const element = reportRef.current;
+  const scrollers = Array.from(element.querySelectorAll(".att-scroll"));
+  const blocks = Array.from(element.querySelectorAll(".dept-block"));
 
-      const blob = await html2pdf().set(opt).from(element).output("blob");
-      const url = URL.createObjectURL(blob);
-      window.open(url);
-    } catch (err) {
-      console.error("PDF generation failed:", err);
-      toast.error("PDF generate korte problem hoyeche.", {
-        position: "bottom-right",
+  // Original style save kore rakhi, PDF sesh hole restore korbo
+  const prevScrollerOverflow = scrollers.map((s) => s.style.overflow);
+  const prevElementWidth = element.style.width;
+  const prevElementDisplay = element.style.display;
+  const inserted = []; // pagination er jonno dhukano temporary element gulo
+
+  try {
+    const html2pdf = (await import("html2pdf.js")).default;
+
+    // 1) Scroll container gulo theke clip tule dei
+    scrollers.forEach((s) => {
+      s.style.overflow = "visible";
+    });
+
+    // 2) Report ta content-er shoman width e shukriye ani
+    element.style.display = "inline-block";
+    element.style.width = "max-content";
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    const fullWidth = Math.ceil(element.getBoundingClientRect().width);
+    element.style.width = `${fullWidth}px`;
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    // 3) Page-er height (px) hishab: legal landscape = 14in x 8.5in, margin 0.3in
+    const PAGE_INNER_W_IN = 14 - 0.6;
+    const PAGE_INNER_H_IN = 8.5 - 0.6;
+    const pagePx = fullWidth * (PAGE_INNER_H_IN / PAGE_INNER_W_IN);
+
+    const topOf = (el) =>
+      el.getBoundingClientRect().top - element.getBoundingClientRect().top;
+    const heightOf = (el) => el.getBoundingClientRect().height;
+
+    // 4) Row page-er majhe kete na jay, tai spacer diye next page-e thelei
+    blocks.forEach((block, idx) => {
+      const table = block.querySelector(".att-table");
+      if (!table) return;
+
+      const headRows = Array.from(table.querySelectorAll("thead tr"));
+      const bodyRows = Array.from(table.querySelectorAll("tbody tr"));
+      const colHeadRow = headRows[headRows.length - 1]; // 1..31, FD, HD ... wala row
+
+      // --- Block (department) level: notun page theke shuru ---
+      const blockTop = topOf(block);
+      const offset = blockTop % pagePx;
+      let shift = 0;
+
+      if (idx > 0 && offset > 2) {
+        shift = pagePx - offset; // prottek department notun page e
+      } else if (bodyRows[0]) {
+        // Header + prothom row ei page e fit na hole puro block next page e
+        const need = topOf(bodyRows[0]) + heightOf(bodyRows[0]) - blockTop;
+        if (offset + need > pagePx) shift = pagePx - offset;
+      }
+
+      if (shift > 0) {
+        const spacer = document.createElement("div");
+        spacer.style.cssText = `height:${shift}px;margin:0;padding:0;`;
+        block.parentNode.insertBefore(spacer, block);
+        inserted.push(spacer);
+      }
+
+      // --- Row level: page-er sheshe row katle next page e pathao ---
+      bodyRows.forEach((tr) => {
+        const t = topOf(tr);
+        const h = heightOf(tr);
+        const boundary = (Math.floor(t / pagePx) + 1) * pagePx;
+
+        if (t + h > boundary - 1) {
+          const gap = boundary - t;
+
+          const spacerRow = document.createElement("tr");
+          const td = document.createElement("td");
+          td.colSpan = days.length + 7;
+          td.style.cssText = `height:${gap}px;padding:0;border:0;background:#fff;line-height:0;font-size:0;`;
+          spacerRow.appendChild(td);
+          tr.parentNode.insertBefore(spacerRow, tr);
+          inserted.push(spacerRow);
+
+          // Notun page-er upore column header abar boshao
+          if (colHeadRow) {
+            const clonedHead = colHeadRow.cloneNode(true);
+            tr.parentNode.insertBefore(clonedHead, tr);
+            inserted.push(clonedHead);
+          }
+        }
       });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+    });
+
+    const opt = {
+      margin: 0.3,
+      filename: "attendance-report.pdf",
+      html2canvas: {
+        scale: 3,
+        useCORS: true,
+        scrollX: 0,
+        scrollY: 0,
+        width: fullWidth,
+        windowWidth: fullWidth,
+        windowHeight: element.scrollHeight,
+      },
+      jsPDF: { unit: "in", format: "legal", orientation: "landscape" },
+      // Page break amra nijei spacer diye handle korechi, tai library-r auto break off
+      pagebreak: { mode: [] },
+    };
+
+    const blob = await html2pdf().set(opt).from(element).output("blob");
+    const url = URL.createObjectURL(blob);
+    window.open(url);
+  } catch (err) {
+    console.error("PDF generation failed:", err);
+    toast.error("PDF generate korte problem hoyeche.", {
+      position: "bottom-right",
+    });
+  } finally {
+    // Temporary element gulo remove + style restore
+    inserted.forEach((el) => el.remove());
+    scrollers.forEach((s, i) => {
+      s.style.overflow = prevScrollerOverflow[i];
+    });
+    element.style.width = prevElementWidth;
+    element.style.display = prevElementDisplay;
+    setIsGenerating(false);
+  }
+};
 
   const openStatusModal = (staff, type) => {
     let records = [];
@@ -234,12 +340,14 @@ export default function AttendanceTable({
     });
 
     setRowSelections(initialSelections);
+    setBulkAdjustment("");
     setStatusModal({ staffName: staff.staffName, type, typeLabel, records });
   };
 
   const closeStatusModal = () => {
     setStatusModal(null);
     setRowSelections(new Map());
+    setBulkAdjustment("");
   };
 
   const toggleRowSelected = (recordId) => {
@@ -259,6 +367,20 @@ export default function AttendanceTable({
         ...current,
         adjustment: value,
         selected: value !== "None",
+      });
+      return next;
+    });
+  };
+
+  // Selected row gulo te ek shathe adjustment apply kora
+  const applyAdjustmentToSelected = (value) => {
+    if (!value) return;
+    setRowSelections((prev) => {
+      const next = new Map(prev);
+      next.forEach((val, key) => {
+        if (val.selected) {
+          next.set(key, { ...val, adjustment: value });
+        }
       });
       return next;
     });
@@ -463,13 +585,13 @@ export default function AttendanceTable({
                   <p className="mb-2 text-xs italic text-gray-600 bg-yellow-50 border border-yellow-200 rounded px-2 py-1">
                     Note: For <strong>{dept.departmentName}</strong>,{" "}
                     <strong>{halfDayAllowed}</strong> Half-day
-                    {Number(halfDayAllowed) !== 1 ? "s" : ""} will be treated
-                    as <strong>{halfDayAllowed} Full-day</strong>.
+                    {Number(halfDayAllowed) !== 1 ? "s" : ""} will be treated as{" "}
+                    <strong>{halfDayAllowed} Full-day</strong>.
                   </p>
                 )}
 
-                <div className="overflow-x-auto border border-gray-300 rounded-md">
-                  <table className="border-collapse text-xs w-full">
+                <div className="att-scroll overflow-x-auto border border-gray-300 rounded-md">
+                  <table className="att-table border-collapse text-xs w-full">
                     <thead>
                       <tr>
                         <th
@@ -481,35 +603,26 @@ export default function AttendanceTable({
                         </th>
                       </tr>
                       <tr>
-                        <th className="border border-gray-300 p-2 sticky left-0 bg-slate-700 text-white z-10 text-sm whitespace-nowrap">
+                        <th
+                          className="border border-gray-300 px-1.5 py-1 sticky left-0 bg-slate-700 text-white z-10 text-xs"
+                          style={{ width: "1%" }}
+                        >
                           Staff
                         </th>
                         {days.map((d, idx) => (
                           <th
                             key={idx}
-                            className="border border-gray-300 p-1 bg-slate-200 text-xs align-middle w-[28px]"
+                            className="border border-gray-300 px-0 py-1 bg-slate-200 text-[10px] align-middle w-[26px] min-w-[26px]"
                           >
                             {d.getDate()}
                           </th>
                         ))}
-                        <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
-                          FD
-                        </th>
-                        <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
-                          HD
-                        </th>
-                        <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
-                          P
-                        </th>
-                        <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
-                          A
-                        </th>
-                        <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
-                          WO
-                        </th>
-                        <th className="border border-gray-300 p-1 bg-blue-100 text-xs align-middle font-bold">
-                          HA
-                        </th>
+                        <th className={SUMMARY_TH}>FD</th>
+                        <th className={SUMMARY_TH}>HD</th>
+                        <th className={SUMMARY_TH}>P</th>
+                        <th className={SUMMARY_TH}>A</th>
+                        <th className={SUMMARY_TH}>WO</th>
+                        <th className={SUMMARY_TH}>HA</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -520,11 +633,23 @@ export default function AttendanceTable({
                             staffIdx % 2 === 0 ? "bg-white" : "bg-gray-50"
                           }
                         >
-                          <td className="border border-gray-300 p-1.5 sticky left-0 bg-inherit whitespace-nowrap text-xs font-medium align-middle">
-                            {staff.staffName}
-                            <p className="text-[10px] text-gray-500 font-normal">
-                              {staff.staffId || "-"}
-                            </p>
+                          <td
+                            className="border border-gray-300 px-1.5 py-1 sticky left-0 bg-inherit text-xs font-medium align-middle"
+                            style={{ width: "1%" }}
+                          >
+                            {/* Nam jotota lage setukui jayga, boro hole NAME_MAX_WIDTH e giye niche wrap hobe */}
+                            <div
+                              style={{
+                                width: "max-content",
+                                maxWidth: NAME_MAX_WIDTH,
+                                lineHeight: 1.15,
+                              }}
+                            >
+                              {staff.staffName}
+                              <p className="text-[10px] text-gray-500 font-normal">
+                                {staff.staffId || "-"}
+                              </p>
+                            </div>
                           </td>
                           {days.map((d, idx) => {
                             const record = staff.attendances.find(
@@ -536,7 +661,7 @@ export default function AttendanceTable({
                             return (
                               <td
                                 key={idx}
-                                className={`border border-gray-300 p-0.5 text-center leading-tight align-middle ${
+                                className={`border border-gray-300 px-0 py-0.5 text-center leading-tight align-middle ${
                                   record ? "cursor-help hover:bg-blue-50" : ""
                                 }`}
                                 onMouseEnter={
@@ -550,17 +675,17 @@ export default function AttendanceTable({
                               >
                                 {record ? (
                                   <div>
-                                    <div className="text-[9px] text-gray-500">
+                                    <div className="text-[8px] text-gray-500">
                                       {record.entryTime &&
                                         format(record.entryTime, "hh:mmaaaaa")}
                                     </div>
-                                    <div className="text-[9px] text-gray-500">
+                                    <div className="text-[8px] text-gray-500">
                                       {record.exitTime &&
                                         format(record.exitTime, "hh:mmaaaaa")}
                                     </div>
                                     <div className="text-[10px] font-semibold">
                                       {record.status === "week-off" ? (
-                                        <span className="inline-block border border-red-500 text-red-600 rounded-sm px-1 leading-tight">
+                                        <span className="inline-block border border-red-500 text-red-600 rounded-sm px-0.5 leading-tight">
                                           WO
                                         </span>
                                       ) : (
@@ -575,42 +700,42 @@ export default function AttendanceTable({
                             );
                           })}
                           <td
-                            className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
+                            className={SUMMARY_TD}
                             onClick={() => openStatusModal(staff, "full-day")}
                             title="Click to view & adjust Full Day dates"
                           >
                             {staff.fullDays}
                           </td>
                           <td
-                            className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
+                            className={SUMMARY_TD}
                             onClick={() => openStatusModal(staff, "half-day")}
                             title="Click to view & adjust Half Day dates"
                           >
                             {staff.halfDays}
                           </td>
                           <td
-                            className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
+                            className={SUMMARY_TD}
                             onClick={() => openStatusModal(staff, "present")}
                             title="Click to view & adjust Present dates"
                           >
                             {staff.presents}
                           </td>
                           <td
-                            className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
+                            className={SUMMARY_TD}
                             onClick={() => openStatusModal(staff, "absent")}
                             title="Click to view & adjust Absent dates"
                           >
                             {staff.absents}
                           </td>
                           <td
-                            className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
+                            className={SUMMARY_TD}
                             onClick={() => openStatusModal(staff, "week-off")}
                             title="Click to view Week Off dates"
                           >
                             {getWeekOffCount(staff)}
                           </td>
                           <td
-                            className="border border-gray-300 p-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle"
+                            className={SUMMARY_TD}
                             onClick={() => openStatusModal(staff, "ha")}
                             title="Click to view existing HR adjustments"
                           >
@@ -710,11 +835,42 @@ export default function AttendanceTable({
         </Modal.Header>
         <Modal.Body>
           {isCurrentModalAdjustable && (
-            <div className="flex justify-between items-center mb-3">
-              <Badge color="info">{selectedCount} selected</Badge>
-              <Button size="xs" color="gray" onClick={toggleSelectAll}>
-                Select / Deselect All
-              </Button>
+            <div className="mb-3 space-y-2">
+              <div className="flex justify-between items-center">
+                <Badge color="info">{selectedCount} selected</Badge>
+                <Button size="xs" color="gray" onClick={toggleSelectAll}>
+                  Select / Deselect All
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 p-2">
+                <span className="text-xs font-medium text-gray-700 whitespace-nowrap">
+                  Apply to all selected:
+                </span>
+                <Select
+                  sizing="sm"
+                  className="flex-1"
+                  value={bulkAdjustment}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    applyAdjustmentToSelected(value);
+                    // Apply howar por reset, jate porer kono row check kore same option abar select kora jay
+                    setBulkAdjustment("");
+                  }}
+                  disabled={selectedCount === 0}
+                >
+                  <option value="">
+                    {selectedCount === 0
+                      ? "Select dates first"
+                      : "Choose adjustment..."}
+                  </option>
+                  {(ADJUSTMENT_OPTIONS[statusModal?.type] || []).map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
             </div>
           )}
 
