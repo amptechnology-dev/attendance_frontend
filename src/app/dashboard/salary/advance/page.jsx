@@ -1,7 +1,4 @@
-import Datatable from "../../components/DatatableSimple";
-import { columns } from "./columns";
-import AddAdvance from "./add";
-import ViewTrans from "./viewTrans";
+import AdvancePageClient from "./advancePageClient";
 import { fetchWithCookies } from "@/lib/fetchWithCookies";
 import { redirect } from "next/navigation";
 
@@ -45,28 +42,18 @@ export default async function Page() {
     console.log(error);
   });
 
-  const data = fetchData?.data;
-  const staffs = fetchStaffs?.data;
-  const staffsWithNoAdvance = staffs?.filter(
-    (staff) => !data?.some((d) => d._id.toString() === staff._id.toString())
+  const data = fetchData?.data || [];
+  const staffs = fetchStaffs?.data || [];
+  const staffsWithNoAdvance = staffs.filter(
+    (staff) => !data.some((d) => d._id.toString() === staff._id.toString())
   );
 
   return (
-    <div>
-      <div className="mb-2">
-        <ViewTrans data={fetchTrans?.data} />
-      </div>
-      <Datatable
-        tableHeading="Manage Advance Salary"
-        data={data}
-        columns={columns}
-        Button={
-          <AddAdvance
-            staffs={staffsWithNoAdvance}
-            departments={fetchDepartments?.data}
-          />
-        }
-      />
-    </div>
+    <AdvancePageClient
+      activeAdvances={data}
+      initialTransactions={fetchTrans?.data || []}
+      staffsWithNoAdvance={staffsWithNoAdvance}
+      departments={fetchDepartments?.data || []}
+    />
   );
 }

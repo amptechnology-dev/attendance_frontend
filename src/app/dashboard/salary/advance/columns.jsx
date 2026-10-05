@@ -30,22 +30,23 @@ export const columns = [
     header: "Remaining Months",
     cell: (info) => {
       const cellValue = info.getValue();
-      const today = new Date();
-      const pauseTill = new Date(info.row.original.advanceSalary?.pauseTill);
+      const now = new Date();
+      const curMonth = now.getMonth() + 1;
+      const curYear = now.getFullYear();
+      const isPaused = (
+        info.row.original.advanceSalary?.pausedMonths || []
+      ).some((p) => p.month === curMonth && p.year === curYear);
 
-      if (!pauseTill) return cellValue;
+      if (!isPaused) return cellValue;
 
-      const isPaused = pauseTill >= today;
-      if (isPaused) {
-        return (
-          <div className="flex items-center gap-2">
-            <span>{cellValue}</span>
-            <Badge size="xs">Paused</Badge>
-          </div>
-        );
-      }
-
-      return cellValue;
+      return (
+        <div className="flex items-center gap-2">
+          <span>{cellValue}</span>
+          <Badge size="xs" color="warning">
+            Paused
+          </Badge>
+        </div>
+      );
     },
   },
   {

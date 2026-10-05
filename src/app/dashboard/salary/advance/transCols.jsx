@@ -1,32 +1,48 @@
 "use client";
 import { format } from "date-fns";
+import { Badge } from "flowbite-react";
+
+const typeColor = {
+  add: "info",
+  deduct: "success",
+  update: "warning",
+};
+
+const dash = (v) => (v === undefined || v === null || v === "" ? "-" : v);
 
 export const columns = [
   {
     accessorKey: "staff.staffId",
     header: "Staff ID",
-    cell: (info) => info.getValue(),
+    cell: (info) => dash(info.getValue()),
   },
   {
     accessorKey: "staff.fullName",
     header: "Name",
-    cell: (info) => info.getValue(),
+    cell: (info) => dash(info.getValue()),
   },
   {
     accessorKey: "month",
     header: "Month",
-    cell: (info) =>
-      info.getValue() ? `${info.getValue()} - ${info.row.original.year}` : "-",
+    cell: (info) => {
+      const { month, year } = info.row.original;
+      if (!month || !year) return "-";
+      return format(new Date(year, month - 1, 1), "MMM yyyy");
+    },
   },
   {
     accessorKey: "type",
     header: "Type",
-    cell: (info) => info.getValue(),
+    cell: (info) => (
+      <Badge color={typeColor[info.getValue()] || "gray"} className="w-fit">
+        {info.getValue()}
+      </Badge>
+    ),
   },
   {
     accessorKey: "amount",
     header: "Amount",
-    cell: (info) => info.getValue(),
+    cell: (info) => dash(info.getValue()),
   },
   {
     header: "Old",
@@ -34,11 +50,11 @@ export const columns = [
       <div>
         <p>
           <strong>Remaining: </strong>
-          {info.row.original.previousAmount}
+          {dash(info.row.original.previousAmount)}
         </p>
         <p>
           <strong>Months: </strong>
-          {info.row.original.previousMonths}
+          {dash(info.row.original.previousMonths)}
         </p>
       </div>
     ),
@@ -49,11 +65,11 @@ export const columns = [
       <div>
         <p>
           <strong>Remaining: </strong>
-          {info.row.original.newAmount}
+          {dash(info.row.original.newAmount)}
         </p>
         <p>
           <strong>Months: </strong>
-          {info.row.original.newMonths}
+          {dash(info.row.original.newMonths)}
         </p>
       </div>
     ),
@@ -66,7 +82,10 @@ export const columns = [
   {
     accessorKey: "createdAt",
     header: "Date",
-    cell: (info) => format(info.getValue(), "dd/MM/yyyy hh:mm a"),
+    cell: (info) =>
+      info.getValue()
+        ? format(new Date(info.getValue()), "dd/MM/yyyy hh:mm a")
+        : "-",
     enableSorting: false,
   },
 ];
