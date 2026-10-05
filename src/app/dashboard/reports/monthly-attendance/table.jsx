@@ -35,6 +35,39 @@ const HOVER_DELAY_MS = 200;
 // Staff name column er max width (er beshi hole niche wrap hobe)
 const NAME_MAX_WIDTH = 120;
 
+// ---------- PDF page config (Legal landscape) ----------
+const PAGE_W_IN = 14;
+const PAGE_H_IN = 8.5;
+const PAGE_MARGIN = 0.25;
+
+// PDF generate howar shomoy-i shudhu ei style gulo kaaj korbe (.pdf-mode class thakle)
+// Goal: font boro + dark, column gulo legal width-e fit
+const PDF_MODE_CSS = `
+.pdf-mode .att-table .day-th {
+  width: 33px !important; min-width: 33px !important;
+  font-size: 12px !important; font-weight: 700 !important; color: #000 !important;
+}
+.pdf-mode .att-table .day-td {
+  width: 33px !important; min-width: 33px !important;
+  padding-top: 3px !important; padding-bottom: 3px !important;
+}
+.pdf-mode .att-table .day-time {
+  font-size: 9px !important; font-weight: 600 !important;
+  color: #111 !important; line-height: 1.15 !important; letter-spacing: -0.2px;
+}
+.pdf-mode .att-table .day-status {
+  font-size: 13px !important; font-weight: 700 !important; line-height: 1.2 !important;
+}
+.pdf-mode .att-table .sum-th,
+.pdf-mode .att-table .sum-td {
+  width: 26px !important; min-width: 26px !important;
+  font-size: 12px !important; color: #000 !important;
+}
+.pdf-mode .att-table .name-td { font-size: 12px !important; }
+.pdf-mode .att-table .name-box { max-width: 105px !important; }
+.pdf-mode .att-table .name-id { font-size: 9px !important; color: #222 !important; }
+`;
+
 // Week-off count: backend theke weekOffs ashle seta, na hole attendances theke count
 const getWeekOffCount = (staff) =>
   staff.weekOffs ??
@@ -43,15 +76,15 @@ const getWeekOffCount = (staff) =>
 const fmtTime = (t) => (t ? format(new Date(t), "hh:mm a") : "—");
 
 // duty-timing.department kokhono populated object ({_id, name}) abar kokhono
-// শুধু ObjectId string hoy — dutorokom case-i handle kora hocche eikhane
+// shudhu ObjectId string hoy — dutorokom case-i handle kora hocche eikhane
 const extractDeptId = (deptField) =>
   deptField && typeof deptField === "object" ? deptField._id : deptField;
 
 // Summary (FD/HD/P/A/WO/HA) column er common class — choto font, kom padding
 const SUMMARY_TH =
-  "border border-gray-300 px-0.5 py-1 bg-blue-100 text-[10px] align-middle font-bold w-[22px] min-w-[22px] text-center";
+  "sum-th border border-gray-300 px-0.5 py-1 bg-blue-100 text-[10px] align-middle font-bold w-[22px] min-w-[22px] text-center";
 const SUMMARY_TD =
-  "border border-gray-300 px-0.5 py-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle text-[10px] w-[22px] min-w-[22px]";
+  "sum-td border border-gray-300 px-0.5 py-1 text-center cursor-pointer hover:bg-blue-100 font-semibold text-blue-700 align-middle text-[10px] w-[22px] min-w-[22px]";
 
 export default function AttendanceTable({
   data = [],
@@ -161,136 +194,141 @@ export default function AttendanceTable({
     statusModal && ADJUSTABLE_TYPES.includes(statusModal.type);
 
   const handleDownload = async () => {
-  setIsGenerating(true);
+    setIsGenerating(true);
+    handleCellLeave(); // hover popover thakle bondho kore dai
 
-  const element = reportRef.current;
-  const scrollers = Array.from(element.querySelectorAll(".att-scroll"));
-  const blocks = Array.from(element.querySelectorAll(".dept-block"));
+    const element = reportRef.current;
+    const scrollers = Array.from(element.querySelectorAll(".att-scroll"));
+    const blocks = Array.from(element.querySelectorAll(".dept-block"));
 
-  // Original style save kore rakhi, PDF sesh hole restore korbo
-  const prevScrollerOverflow = scrollers.map((s) => s.style.overflow);
-  const prevElementWidth = element.style.width;
-  const prevElementDisplay = element.style.display;
-  const inserted = []; // pagination er jonno dhukano temporary element gulo
+    // Original style save kore rakhi, PDF sesh hole restore korbo
+    const prevScrollerOverflow = scrollers.map((s) => s.style.overflow);
+    const prevElementWidth = element.style.width;
+    const prevElementDisplay = element.style.display;
+    const inserted = []; // pagination er jonno dhukano temporary element gulo
 
-  try {
-    const html2pdf = (await import("html2pdf.js")).default;
+    try {
+      const html2pdf = (await import("html2pdf.js")).default;
 
-    // 1) Scroll container gulo theke clip tule dei
-    scrollers.forEach((s) => {
-      s.style.overflow = "visible";
-    });
+      // 0) PDF-mode on: font boro + column fit korar style apply
+      element.classList.add("pdf-mode");
 
-    // 2) Report ta content-er shoman width e shukriye ani
-    element.style.display = "inline-block";
-    element.style.width = "max-content";
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-
-    const fullWidth = Math.ceil(element.getBoundingClientRect().width);
-    element.style.width = `${fullWidth}px`;
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-
-    // 3) Page-er height (px) hishab: legal landscape = 14in x 8.5in, margin 0.3in
-    const PAGE_INNER_W_IN = 14 - 0.6;
-    const PAGE_INNER_H_IN = 8.5 - 0.6;
-    const pagePx = fullWidth * (PAGE_INNER_H_IN / PAGE_INNER_W_IN);
-
-    const topOf = (el) =>
-      el.getBoundingClientRect().top - element.getBoundingClientRect().top;
-    const heightOf = (el) => el.getBoundingClientRect().height;
-
-    // 4) Row page-er majhe kete na jay, tai spacer diye next page-e thelei
-    blocks.forEach((block, idx) => {
-      const table = block.querySelector(".att-table");
-      if (!table) return;
-
-      const headRows = Array.from(table.querySelectorAll("thead tr"));
-      const bodyRows = Array.from(table.querySelectorAll("tbody tr"));
-      const colHeadRow = headRows[headRows.length - 1]; // 1..31, FD, HD ... wala row
-
-      // --- Block (department) level: notun page theke shuru ---
-      const blockTop = topOf(block);
-      const offset = blockTop % pagePx;
-      let shift = 0;
-
-      if (idx > 0 && offset > 2) {
-        shift = pagePx - offset; // prottek department notun page e
-      } else if (bodyRows[0]) {
-        // Header + prothom row ei page e fit na hole puro block next page e
-        const need = topOf(bodyRows[0]) + heightOf(bodyRows[0]) - blockTop;
-        if (offset + need > pagePx) shift = pagePx - offset;
-      }
-
-      if (shift > 0) {
-        const spacer = document.createElement("div");
-        spacer.style.cssText = `height:${shift}px;margin:0;padding:0;`;
-        block.parentNode.insertBefore(spacer, block);
-        inserted.push(spacer);
-      }
-
-      // --- Row level: page-er sheshe row katle next page e pathao ---
-      bodyRows.forEach((tr) => {
-        const t = topOf(tr);
-        const h = heightOf(tr);
-        const boundary = (Math.floor(t / pagePx) + 1) * pagePx;
-
-        if (t + h > boundary - 1) {
-          const gap = boundary - t;
-
-          const spacerRow = document.createElement("tr");
-          const td = document.createElement("td");
-          td.colSpan = days.length + 7;
-          td.style.cssText = `height:${gap}px;padding:0;border:0;background:#fff;line-height:0;font-size:0;`;
-          spacerRow.appendChild(td);
-          tr.parentNode.insertBefore(spacerRow, tr);
-          inserted.push(spacerRow);
-
-          // Notun page-er upore column header abar boshao
-          if (colHeadRow) {
-            const clonedHead = colHeadRow.cloneNode(true);
-            tr.parentNode.insertBefore(clonedHead, tr);
-            inserted.push(clonedHead);
-          }
-        }
+      // 1) Scroll container gulo theke clip tule dei
+      scrollers.forEach((s) => {
+        s.style.overflow = "visible";
       });
-    });
 
-    const opt = {
-      margin: 0.3,
-      filename: "attendance-report.pdf",
-      html2canvas: {
-        scale: 3,
-        useCORS: true,
-        scrollX: 0,
-        scrollY: 0,
-        width: fullWidth,
-        windowWidth: fullWidth,
-        windowHeight: element.scrollHeight,
-      },
-      jsPDF: { unit: "in", format: "legal", orientation: "landscape" },
-      // Page break amra nijei spacer diye handle korechi, tai library-r auto break off
-      pagebreak: { mode: [] },
-    };
+      // 2) Report ta content-er shoman width e shukriye ani
+      element.style.display = "inline-block";
+      element.style.width = "max-content";
+      await new Promise((resolve) => requestAnimationFrame(resolve));
 
-    const blob = await html2pdf().set(opt).from(element).output("blob");
-    const url = URL.createObjectURL(blob);
-    window.open(url);
-  } catch (err) {
-    console.error("PDF generation failed:", err);
-    toast.error("PDF generate korte problem hoyeche.", {
-      position: "bottom-right",
-    });
-  } finally {
-    // Temporary element gulo remove + style restore
-    inserted.forEach((el) => el.remove());
-    scrollers.forEach((s, i) => {
-      s.style.overflow = prevScrollerOverflow[i];
-    });
-    element.style.width = prevElementWidth;
-    element.style.display = prevElementDisplay;
-    setIsGenerating(false);
-  }
-};
+      const fullWidth = Math.ceil(element.getBoundingClientRect().width);
+      element.style.width = `${fullWidth}px`;
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+
+      // 3) Page-er height (px) hishab: legal landscape = 14in x 8.5in
+      const PAGE_INNER_W_IN = PAGE_W_IN - PAGE_MARGIN * 2;
+      const PAGE_INNER_H_IN = PAGE_H_IN - PAGE_MARGIN * 2;
+      const pagePx = fullWidth * (PAGE_INNER_H_IN / PAGE_INNER_W_IN);
+
+      const topOf = (el) =>
+        el.getBoundingClientRect().top - element.getBoundingClientRect().top;
+      const heightOf = (el) => el.getBoundingClientRect().height;
+
+      // 4) Row page-er majhe kete na jay, tai spacer diye next page-e thelei
+      blocks.forEach((block, idx) => {
+        const table = block.querySelector(".att-table");
+        if (!table) return;
+
+        const headRows = Array.from(table.querySelectorAll("thead tr"));
+        const bodyRows = Array.from(table.querySelectorAll("tbody tr"));
+        const colHeadRow = headRows[headRows.length - 1]; // 1..31, FD, HD ... wala row
+
+        // --- Block (department) level: notun page theke shuru ---
+        const blockTop = topOf(block);
+        const offset = blockTop % pagePx;
+        let shift = 0;
+
+        if (idx > 0 && offset > 2) {
+          shift = pagePx - offset; // prottek department notun page e
+        } else if (bodyRows[0]) {
+          // Header + prothom row ei page e fit na hole puro block next page e
+          const need = topOf(bodyRows[0]) + heightOf(bodyRows[0]) - blockTop;
+          if (offset + need > pagePx) shift = pagePx - offset;
+        }
+
+        if (shift > 0) {
+          const spacer = document.createElement("div");
+          spacer.style.cssText = `height:${shift}px;margin:0;padding:0;`;
+          block.parentNode.insertBefore(spacer, block);
+          inserted.push(spacer);
+        }
+
+        // --- Row level: page-er sheshe row katle next page e pathao ---
+        bodyRows.forEach((tr) => {
+          const t = topOf(tr);
+          const h = heightOf(tr);
+          const boundary = (Math.floor(t / pagePx) + 1) * pagePx;
+
+          if (t + h > boundary - 1) {
+            const gap = boundary - t;
+
+            const spacerRow = document.createElement("tr");
+            const td = document.createElement("td");
+            td.colSpan = days.length + 7;
+            td.style.cssText = `height:${gap}px;padding:0;border:0;background:#fff;line-height:0;font-size:0;`;
+            spacerRow.appendChild(td);
+            tr.parentNode.insertBefore(spacerRow, tr);
+            inserted.push(spacerRow);
+
+            // Notun page-er upore column header abar boshao
+            if (colHeadRow) {
+              const clonedHead = colHeadRow.cloneNode(true);
+              tr.parentNode.insertBefore(clonedHead, tr);
+              inserted.push(clonedHead);
+            }
+          }
+        });
+      });
+
+      const opt = {
+        margin: PAGE_MARGIN,
+        filename: "attendance-report.pdf",
+        html2canvas: {
+          scale: 3,
+          useCORS: true,
+          scrollX: 0,
+          scrollY: 0,
+          width: fullWidth,
+          windowWidth: fullWidth,
+          windowHeight: element.scrollHeight,
+        },
+        jsPDF: { unit: "in", format: "legal", orientation: "landscape" },
+        // Page break amra nijei spacer diye handle korechi, tai library-r auto break off
+        pagebreak: { mode: [] },
+      };
+
+      const blob = await html2pdf().set(opt).from(element).output("blob");
+      const url = URL.createObjectURL(blob);
+      window.open(url);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      toast.error("PDF generate korte problem hoyeche.", {
+        position: "bottom-right",
+      });
+    } finally {
+      // Temporary element gulo remove + style restore
+      inserted.forEach((el) => el.remove());
+      scrollers.forEach((s, i) => {
+        s.style.overflow = prevScrollerOverflow[i];
+      });
+      element.style.width = prevElementWidth;
+      element.style.display = prevElementDisplay;
+      element.classList.remove("pdf-mode");
+      setIsGenerating(false);
+    }
+  };
 
   const openStatusModal = (staff, type) => {
     let records = [];
@@ -494,6 +532,9 @@ export default function AttendanceTable({
 
   return (
     <div>
+      {/* PDF-mode override style (shudhu .pdf-mode class thakle kaaj kore) */}
+      <style>{PDF_MODE_CSS}</style>
+
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <button
           onClick={handleDownload}
@@ -612,7 +653,7 @@ export default function AttendanceTable({
                         {days.map((d, idx) => (
                           <th
                             key={idx}
-                            className="border border-gray-300 px-0 py-1 bg-slate-200 text-[10px] align-middle w-[26px] min-w-[26px]"
+                            className="day-th border border-gray-300 px-0 py-1 bg-slate-200 text-[10px] align-middle w-[26px] min-w-[26px]"
                           >
                             {d.getDate()}
                           </th>
@@ -634,11 +675,12 @@ export default function AttendanceTable({
                           }
                         >
                           <td
-                            className="border border-gray-300 px-1.5 py-1 sticky left-0 bg-inherit text-xs font-medium align-middle"
+                            className="name-td border border-gray-300 px-1.5 py-1 sticky left-0 bg-inherit text-xs font-medium align-middle"
                             style={{ width: "1%" }}
                           >
                             {/* Nam jotota lage setukui jayga, boro hole NAME_MAX_WIDTH e giye niche wrap hobe */}
                             <div
+                              className="name-box"
                               style={{
                                 width: "max-content",
                                 maxWidth: NAME_MAX_WIDTH,
@@ -646,7 +688,7 @@ export default function AttendanceTable({
                               }}
                             >
                               {staff.staffName}
-                              <p className="text-[10px] text-gray-500 font-normal">
+                              <p className="name-id text-[10px] text-gray-500 font-normal">
                                 {staff.staffId || "-"}
                               </p>
                             </div>
@@ -661,7 +703,7 @@ export default function AttendanceTable({
                             return (
                               <td
                                 key={idx}
-                                className={`border border-gray-300 px-0 py-0.5 text-center leading-tight align-middle ${
+                                className={`day-td border border-gray-300 px-0 py-0.5 text-center leading-tight align-middle ${
                                   record ? "cursor-help hover:bg-blue-50" : ""
                                 }`}
                                 onMouseEnter={
@@ -675,15 +717,15 @@ export default function AttendanceTable({
                               >
                                 {record ? (
                                   <div>
-                                    <div className="text-[8px] text-gray-500">
+                                    <div className="day-time text-[8px] text-gray-500">
                                       {record.entryTime &&
                                         format(record.entryTime, "hh:mmaaaaa")}
                                     </div>
-                                    <div className="text-[8px] text-gray-500">
+                                    <div className="day-time text-[8px] text-gray-500">
                                       {record.exitTime &&
                                         format(record.exitTime, "hh:mmaaaaa")}
                                     </div>
-                                    <div className="text-[10px] font-semibold">
+                                    <div className="day-status text-[10px] font-semibold">
                                       {record.status === "week-off" ? (
                                         <span className="inline-block border border-red-500 text-red-600 rounded-sm px-0.5 leading-tight">
                                           WO

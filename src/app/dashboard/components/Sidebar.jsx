@@ -64,6 +64,7 @@ const REPORTS_PATHS = [
   "/dashboard/reports/monthly-salary",
   "/dashboard/reports/leaves",
   "/dashboard/reports/attendance-advance",
+  "/dashboard/reports/advance", // NEW
   "/dashboard/reports/performance",
   "/dashboard/reports/pf-ecr",
   "/dashboard/reports/esi-ecr",
@@ -379,6 +380,13 @@ export function AdminSidebar() {
                 active={isActive("/dashboard/reports/attendance-advance")}
               >
                 Adv Attendance
+              </NavItem>
+              <NavItem
+                href="/dashboard/reports/advance"
+                icon={TbMoneybag}
+                active={isActive("/dashboard/reports/advance")}
+              >
+                Advance Report
               </NavItem>
               <NavItem
                 href="/dashboard/reports/performance"

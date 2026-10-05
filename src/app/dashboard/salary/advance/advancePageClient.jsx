@@ -7,14 +7,16 @@ import Datatable from "../../components/DatatableSimple";
 import AddAdvance from "./add";
 import { columns } from "./columns";
 import { columns as transColumns } from "./transCols";
+import AdvanceList from "./advanceList";
 
 export default function AdvancePageClient({
   activeAdvances = [],
   initialTransactions = [],
   staffsWithNoAdvance = [],
   departments = [],
+  allStaffs = [],
 }) {
-  const [tab, setTab] = useState("history"); // "history" | "active"
+  const [tab, setTab] = useState("active");
   const [transactions, setTransactions] = useState(initialTransactions);
   const [loading, setLoading] = useState(false);
 
@@ -62,7 +64,7 @@ export default function AdvancePageClient({
 
         const response = await fetch(
           `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/advance-transaction/get?${params.toString()}`,
-          { credentials: "include", signal: controller.signal }
+          { credentials: "include", signal: controller.signal },
         );
         if (!response.ok) throw new Error("Failed to load transactions");
         const json = await response.json();
@@ -96,17 +98,17 @@ export default function AdvancePageClient({
       <div className="mb-4 flex gap-2">
         <Button
           size="sm"
+          color={tab === "active" ? "blue" : "gray"}
+          onClick={() => setTab("active")}
+        >
+          Advances
+        </Button>
+        <Button
+          size="sm"
           color={tab === "history" ? "blue" : "gray"}
           onClick={() => setTab("history")}
         >
           All Transactions
-        </Button>
-        <Button
-          size="sm"
-          color={tab === "active" ? "blue" : "gray"}
-          onClick={() => setTab("active")}
-        >
-          Active Advances
         </Button>
       </div>
 
@@ -173,9 +175,7 @@ export default function AdvancePageClient({
             </div>
           </div>
 
-          {loading && (
-            <p className="mb-2 text-sm text-gray-500">Loading...</p>
-          )}
+          {loading && <p className="mb-2 text-sm text-gray-500">Loading...</p>}
 
           <Datatable
             tableHeading="Advance Salary Transactions"
@@ -185,11 +185,11 @@ export default function AdvancePageClient({
           />
         </>
       ) : (
-        <Datatable
-          tableHeading="Active Advances"
-          data={activeAdvances}
-          columns={columns}
-          Button={addButton}
+        <AdvanceList
+          activeAdvances={activeAdvances}
+          staffs={allStaffs}
+          departments={departments}
+          staffsWithNoAdvance={staffsWithNoAdvance}
         />
       )}
     </div>

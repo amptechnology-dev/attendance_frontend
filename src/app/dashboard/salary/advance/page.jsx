@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Page() {
   const fetchData = await fetchWithCookies(
-    `${process.env.NEXT_PUBLIC_BACKEND_URI}/admin/staff/get-with-advance-salary`
+    `${process.env.NEXT_PUBLIC_BACKEND_URI}/admin/staff/get-with-advance-salary`,
   ).catch((error) => {
     if (error.message === "Unauthorized") {
       redirect("/auth/admin");
@@ -19,7 +19,7 @@ export default async function Page() {
   });
 
   const fetchStaffs = await fetchWithCookies(
-    `${process.env.NEXT_PUBLIC_BACKEND_URI}/admin/staff/get`
+    `${process.env.NEXT_PUBLIC_BACKEND_URI}/admin/staff/get`,
   ).catch((error) => {
     if (error.message === "Unauthorized") {
       redirect("/auth/admin");
@@ -28,7 +28,7 @@ export default async function Page() {
   });
 
   const fetchTrans = await fetchWithCookies(
-    `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/advance-transaction/get`
+    `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/advance-transaction/get`,
   ).catch((error) => {
     if (error.message === "Unauthorized") {
       redirect("/auth/admin");
@@ -37,7 +37,7 @@ export default async function Page() {
   });
 
   const fetchDepartments = await fetchWithCookies(
-    `${process.env.NEXT_PUBLIC_BACKEND_URI}/admin/department/get`
+    `${process.env.NEXT_PUBLIC_BACKEND_URI}/admin/department/get`,
   ).catch((error) => {
     console.log(error);
   });
@@ -45,7 +45,7 @@ export default async function Page() {
   const data = fetchData?.data || [];
   const staffs = fetchStaffs?.data || [];
   const staffsWithNoAdvance = staffs.filter(
-    (staff) => !data.some((d) => d._id.toString() === staff._id.toString())
+    (staff) => !data.some((d) => d._id.toString() === staff._id.toString()),
   );
 
   return (
@@ -54,6 +54,7 @@ export default async function Page() {
       initialTransactions={fetchTrans?.data || []}
       staffsWithNoAdvance={staffsWithNoAdvance}
       departments={fetchDepartments?.data || []}
+      allStaffs={staffs}
     />
   );
 }
