@@ -16,18 +16,78 @@ const fmtDateTime = (d) =>
 const money = (n) => Number(n || 0).toLocaleString("en-IN");
 const monthLabel = (m, y) =>
   m && y ? format(new Date(y, m - 1, 1), "MMM yyyy") : "-";
-const arrow = (a, b) =>
-  a === undefined && b === undefined ? "-" : `${a ?? "-"} → ${b ?? "-"}`;
 
 const TYPE_LABEL = {
   add: "Advance Given",
   deduct: "Salary Deduction",
   update: "Adjustment / Pause",
 };
+
 const STATUS_STYLE = {
   Active: "bg-green-100 text-green-800",
   Paused: "bg-yellow-100 text-yellow-800",
   Closed: "bg-gray-200 text-gray-700",
+};
+
+// Transaction type wise color scheme
+const TYPE_STYLE = {
+  add: {
+    row: "bg-green-50",
+    badge: "bg-green-100 text-green-800 border border-green-300",
+    amount: "text-green-700 font-semibold",
+    sign: "+",
+  },
+  deduct: {
+    row: "bg-red-50",
+    badge: "bg-red-100 text-red-800 border border-red-300",
+    amount: "text-red-700 font-semibold",
+    sign: "−",
+  },
+  update: {
+    row: "bg-amber-50",
+    badge: "bg-amber-100 text-amber-800 border border-amber-300",
+    amount: "text-amber-700 font-semibold",
+    sign: "",
+  },
+};
+
+const DEFAULT_TYPE_STYLE = {
+  row: "bg-white",
+  badge: "bg-gray-100 text-gray-700 border border-gray-300",
+  amount: "text-gray-900 font-semibold",
+  sign: "",
+};
+
+// Summary card value color
+const SUMMARY_COLOR = {
+  "Advance Amount": "text-green-700",
+  "Total Repayment Made": "text-red-600",
+  "Pending Amount": "text-orange-600",
+};
+
+// Running balance: advance dile remaining barbe, payment hole kombe
+const buildRows = (transactions = []) => {
+  const sorted = [...transactions].sort(
+    (x, y) => new Date(x.createdAt) - new Date(y.createdAt),
+  );
+
+  let balance = 0;
+
+  return sorted.map((t) => {
+    const amt = Math.abs(Number(t.amount || 0));
+
+    if (typeof t.newAmount === "number") {
+      // backend jodi remaining pathay, seta-i final
+      balance = t.newAmount;
+    } else if (t.type === "add") {
+      balance += amt;
+    } else if (t.type === "deduct") {
+      balance = Math.max(balance - amt, 0);
+    }
+    // update type e newAmount na thakle balance same thakbe
+
+    return { ...t, remaining: balance };
+  });
 };
 
 export default async function Page({ params, searchParams }) {
@@ -69,6 +129,8 @@ export default async function Page({ params, searchParams }) {
     ["Remarks", a.remarks || "-"],
   ];
 
+  const rows = buildRows(a.transactions);
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-blue-600 pb-2">
@@ -99,7 +161,13 @@ export default async function Page({ params, searchParams }) {
         {summary.map(([label, value]) => (
           <div key={label}>
             <p className="text-xs text-gray-500">{label}</p>
-            <p className="text-sm font-semibold text-gray-900">{value}</p>
+            <p
+              className={`text-sm font-semibold ${
+                SUMMARY_COLOR[label] || "text-gray-900"
+              }`}
+            >
+              {value}
+            </p>
           </div>
         ))}
       </div>
@@ -112,9 +180,28 @@ export default async function Page({ params, searchParams }) {
       )}
 
       <div>
-        <h2 className="mb-2 text-base font-semibold text-gray-900">
-          Transaction History
-        </h2>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold text-gray-900">
+            Transaction History
+          </h2>
+
+          {/* Color legend */}
+          <div className="flex items-center gap-3 text-xs text-gray-600">
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-green-500" />
+              Advance Given
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500" />
+              Salary Deduction
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500" />
+              Adjustment / Pause
+            </span>
+          </div>
+        </div>
+
         <div className="overflow-x-auto rounded-md border border-gray-300">
           <table className="w-full border-collapse text-sm">
             <thead className="bg-slate-200 text-xs">
@@ -128,10 +215,7 @@ export default async function Page({ params, searchParams }) {
                   Amount
                 </th>
                 <th className="border border-gray-300 p-2 text-center">
-                  Remaining Amt (Old → New)
-                </th>
-                <th className="border border-gray-300 p-2 text-center">
-                  Months (Old → New)
+                  Remaining Amount
                 </th>
                 <th className="border border-gray-300 p-2 text-left">
                   Remarks
@@ -139,34 +223,38 @@ export default async function Page({ params, searchParams }) {
               </tr>
             </thead>
             <tbody>
-              {a.transactions.map((t, i) => (
-                <tr
-                  key={t._id}
-                  className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                >
-                  <td className="border border-gray-300 p-2 whitespace-nowrap">
-                    {fmtDateTime(t.createdAt)}
-                  </td>
-                  <td className="border border-gray-300 p-2">
-                    {TYPE_LABEL[t.type] || t.type}
-                  </td>
-                  <td className="border border-gray-300 p-2">
-                    {monthLabel(t.month, t.year)}
-                  </td>
-                  <td className="border border-gray-300 p-2 text-right">
-                    {money(t.amount)}
-                  </td>
-                  <td className="border border-gray-300 p-2 text-center">
-                    {arrow(t.previousAmount, t.newAmount)}
-                  </td>
-                  <td className="border border-gray-300 p-2 text-center">
-                    {arrow(t.previousMonths, t.newMonths)}
-                  </td>
-                  <td className="border border-gray-300 p-2">
-                    {t.remarks || "-"}
-                  </td>
-                </tr>
-              ))}
+              {rows.map((t) => {
+                const style = TYPE_STYLE[t.type] || DEFAULT_TYPE_STYLE;
+                return (
+                  <tr key={t._id} className={style.row}>
+                    <td className="border border-gray-300 p-2 whitespace-nowrap">
+                      {fmtDateTime(t.createdAt)}
+                    </td>
+                    <td className="border border-gray-300 p-2">
+                      <span
+                        className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${style.badge}`}
+                      >
+                        {TYPE_LABEL[t.type] || t.type}
+                      </span>
+                    </td>
+                    <td className="border border-gray-300 p-2">
+                      {monthLabel(t.month, t.year)}
+                    </td>
+                    <td
+                      className={`border border-gray-300 p-2 text-right ${style.amount}`}
+                    >
+                      {style.sign}
+                      {money(Math.abs(t.amount))}
+                    </td>
+                    <td className="border border-gray-300 p-2 text-center font-semibold text-gray-900">
+                      {money(t.remaining)}
+                    </td>
+                    <td className="border border-gray-300 p-2">
+                      {t.remarks || "-"}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
