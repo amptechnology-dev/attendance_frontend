@@ -381,13 +381,13 @@ export function AdminSidebar() {
               >
                 Adv Attendance
               </NavItem>
-              <NavItem
+              {/* <NavItem
                 href="/dashboard/reports/advance"
                 icon={TbMoneybag}
                 active={isActive("/dashboard/reports/advance")}
               >
                 Advance Report
-              </NavItem>
+              </NavItem> */}
               <NavItem
                 href="/dashboard/reports/performance"
                 icon={FaChartPie}

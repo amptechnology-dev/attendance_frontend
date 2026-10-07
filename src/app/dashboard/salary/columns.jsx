@@ -7,7 +7,14 @@ import { RiPencilLine, RiCheckLine, RiCloseLine } from "react-icons/ri";
 import ViewBreakdown from "./viewBreakdown";
 import ViewPresentLog from "./viewPresent";
 
-function ConveyanceCell({ salaryId, value, canEdit }) {
+function EditableAmountCell({
+  salaryId,
+  value,
+  canEdit,
+  endpointSuffix, // "conveyance/update" | "advance/update"
+  label,
+  onUpdated,
+}) {
   const [currentValue, setCurrentValue] = useState(value);
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(value ?? 0);
@@ -32,7 +39,7 @@ function ConveyanceCell({ salaryId, value, canEdit }) {
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/${salaryId}/conveyance/update`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URI}/salary/${salaryId}/${endpointSuffix}`,
         {
           method: "PUT",
           credentials: "include",
@@ -50,12 +57,21 @@ function ConveyanceCell({ salaryId, value, canEdit }) {
         throw new Error(backendMessage);
       }
 
-      setCurrentValue(data.data?.breakdown?.conveyance ?? amount);
-      toast.success("Conveyance updated successfully.");
+      const updatedSalary = data.data;
+      const fieldValue =
+        endpointSuffix === "advance/update"
+          ? updatedSalary?.breakdown?.advanceDeduction
+          : updatedSalary?.breakdown?.conveyance;
+
+      setCurrentValue(fieldValue ?? amount);
+      // Parent table data update (Deductions / Net Salary refresh-er jonno)
+      onUpdated?.(updatedSalary);
+
+      toast.success(`${label} updated successfully.`);
       setIsEditing(false);
     } catch (err) {
-      console.error("Error updating Conveyance Allowance:", err);
-      toast.error(err.message || "Failed to update Conveyance Allowance.", {
+      console.error(`Error updating ${label}:`, err);
+      toast.error(err.message || `Failed to update ${label}.`, {
         position: "bottom-right",
       });
     } finally {
@@ -113,7 +129,7 @@ function ConveyanceCell({ salaryId, value, canEdit }) {
         type="button"
         onClick={() => setIsEditing(true)}
         className="text-gray-500 hover:text-gray-800"
-        title="Edit Conveyance Allowance"
+        title={`Edit ${label}`}
       >
         <RiPencilLine className="w-4 h-4" />
       </button>
@@ -121,7 +137,7 @@ function ConveyanceCell({ salaryId, value, canEdit }) {
   );
 }
 
-export const getColumns = (officeSalaryStructure) => [
+export const getColumns = (officeSalaryStructure, onSalaryUpdated) => [
   {
     accessorKey: "month",
     header: "Month",
@@ -157,10 +173,31 @@ export const getColumns = (officeSalaryStructure) => [
         officeSalaryStructure?.conveyance?.mode === "input";
 
       return (
-        <ConveyanceCell
+        <EditableAmountCell
           salaryId={info.row.original._id}
           value={val}
           canEdit={canEdit}
+          endpointSuffix="conveyance/update"
+          label="Conveyance Allowance"
+          onUpdated={onSalaryUpdated}
+        />
+      );
+    },
+  },
+  {
+    accessorKey: "breakdown.advanceDeduction",
+    header: "Advance",
+    cell: (info) => {
+      const val = info.row.original.breakdown?.advanceDeduction;
+
+      return (
+        <EditableAmountCell
+          salaryId={info.row.original._id}
+          value={val}
+          canEdit={true}
+          endpointSuffix="advance/update"
+          label="Advance Deduction"
+          onUpdated={onSalaryUpdated}
         />
       );
     },

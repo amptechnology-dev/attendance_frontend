@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Select, Spinner } from "flowbite-react";
 import { toast } from "react-toastify";
 import Datatable from "../components/DatatableSimple";
@@ -27,13 +27,38 @@ export default function TabsWithDatatable({
   onExitOvertime,
 }) {
   const [activeTab, setActiveTab] = useState("previous");
-  const columns = getColumns(officeSalaryStructure);
   const showOvertime = !!overtimeParams;
 
   const [pmMonth, setPmMonth] = useState(previousMonthInitial.month);
   const [pmYear, setPmYear] = useState(previousMonthInitial.year);
   const [pmData, setPmData] = useState(previousMonthSalary || []);
   const [pmLoading, setPmLoading] = useState(false);
+  const [last3Data, setLast3Data] = useState(allSalaryData || []);
+
+  // Server theke prop change hole state sync rakho
+  useEffect(() => {
+    setLast3Data(allSalaryData || []);
+  }, [allSalaryData]);
+
+  // Advance/Conveyance update-er por dui table-ei row refresh
+  const handleSalaryUpdated = (updated) => {
+    if (!updated?._id) return;
+    const mergeRow = (row) =>
+      row._id === updated._id
+        ? {
+            ...row, // staff populated object ta thakbe
+            breakdown: { ...row.breakdown, ...updated.breakdown },
+            deductions: updated.deductions,
+            netSalary: updated.netSalary,
+            updatedAt: updated.updatedAt ?? row.updatedAt,
+          }
+        : row;
+
+    setPmData((prev) => prev.map(mergeRow));
+    setLast3Data((prev) => prev.map(mergeRow));
+  };
+
+  const columns = getColumns(officeSalaryStructure, handleSalaryUpdated);
 
   async function fetchPreviousMonthSalary(m, y) {
     setPmLoading(true);
@@ -135,7 +160,7 @@ export default function TabsWithDatatable({
         <Datatable
           tableHeading="Last 3 Months' Salary"
           columns={columns}
-          data={allSalaryData}
+          data={last3Data}
         />
       )}
     </div>

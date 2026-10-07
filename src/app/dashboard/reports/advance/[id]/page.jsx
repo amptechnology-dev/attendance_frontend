@@ -63,7 +63,13 @@ const SUMMARY_COLOR = {
   "Advance Amount": "text-green-700",
   "Total Repayment Made": "text-red-600",
   "Pending Amount": "text-orange-600",
+  "Deduction Start": "text-blue-700",
+  "Deduction Till": "text-blue-700",
 };
+
+// ---------- Period helpers ----------
+const periodKey = (m, y) => y * 12 + (m - 1);
+const keyToLabel = (k) => monthLabel((k % 12) + 1, Math.floor(k / 12));
 
 // Running balance: advance dile remaining barbe, payment hole kombe
 const buildRows = (transactions = []) => {
@@ -88,6 +94,65 @@ const buildRows = (transactions = []) => {
 
     return { ...t, remaining: balance };
   });
+};
+
+// Deduction kon month theke shuru
+const getStartKey = (a, transactions) => {
+  const addTx = [...transactions]
+    .filter((t) => t.type === "add")
+    .sort((x, y) => new Date(x.createdAt) - new Date(y.createdAt))[0];
+
+  const m = a.startMonth ?? addTx?.startMonth ?? addTx?.month;
+  const y = a.startYear ?? addTx?.startYear ?? addTx?.year;
+  if (!m || !y) return null;
+  return periodKey(Number(m), Number(y));
+};
+
+// Deduction kon month porjonto cholbe
+const getEndInfo = (a, transactions, startKey) => {
+  const deducts = transactions.filter(
+    (t) => t.type === "deduct" && t.month && t.year,
+  );
+  const deductKeys = deducts.map((t) => periodKey(t.month, t.year));
+
+  // Closed hole last deduction-er month-i shesh
+  if (a.status === "Closed") {
+    if (!deductKeys.length) return null;
+    return { label: "Deduction Till", key: Math.max(...deductKeys) };
+  }
+
+  const remaining = Number(a.remainingMonths) || 0;
+  if (remaining <= 0 || startKey === null) return null;
+
+  const paused = new Set(
+    (a.pausedMonths || []).map((p) => periodKey(p.month, p.year)),
+  );
+
+  // Last deduction er porer month theke ba start month theke gona shuru
+  let cursor = deductKeys.length
+    ? Math.max(startKey, Math.max(...deductKeys) + 1)
+    : startKey;
+
+  let placed = 0;
+  for (let guard = 0; guard < 600; guard++) {
+    if (!paused.has(cursor)) {
+      placed++;
+      if (placed === remaining) break;
+    }
+    cursor++;
+  }
+
+  return { label: "Deduction Till", key: cursor, expected: true };
+};
+
+// Pause kobe set kora hoyechilo (update transaction er remarks theke)
+const getPauseSetDate = (transactions, month, year) => {
+  const tx = transactions.find((t) => {
+    if (t.type !== "update" || !t.remarks) return false;
+    const match = String(t.remarks).match(/Paused deduction for (\d{4})-(\d{1,2})/);
+    return match && Number(match[1]) === year && Number(match[2]) === month;
+  });
+  return tx?.createdAt || null;
 };
 
 export default async function Page({ params, searchParams }) {
@@ -116,20 +181,35 @@ export default async function Page({ params, searchParams }) {
   const a = res?.data;
   if (!a) notFound();
 
+  const transactions = a.transactions || [];
+  const startKey = getStartKey(a, transactions);
+  const endInfo = getEndInfo(a, transactions, startKey);
+
+  const pausedList = [...(a.pausedMonths || [])].sort(
+    (x, y) => periodKey(x.month, x.year) - periodKey(y.month, y.year),
+  );
+
   const summary = [
     ["Staff", `${a.staffName} (${a.staffId || "-"})`],
     ["Department", a.departmentName],
-    ["Date of Advance", fmtDate(a.dateOfAdvance)],
+    ["Advance Taken On", fmtDate(a.dateOfAdvance)],
     ["Advance Amount", money(a.advanceAmount)],
     ["Total Repayment Made", money(a.totalRepaid)],
     ["Pending Amount", money(a.pendingAmount)],
-    ["Last Payment Date", fmtDate(a.lastPaymentDate)],
-    ["Remaining Months", a.remainingMonths],
+    ["Deduction Start", startKey !== null ? keyToLabel(startKey) : "-"],
+    [
+      "Deduction Till",
+      endInfo
+        ? `${keyToLabel(endInfo.key)}${endInfo.expected ? " (Expected)" : ""}`
+        : "-",
+    ],
     ["Monthly Deduction", money(a.monthlyDeduction)],
+    ["Remaining Months", a.remainingMonths],
+    ["Last Payment Date", fmtDate(a.lastPaymentDate)],
     ["Remarks", a.remarks || "-"],
   ];
 
-  const rows = buildRows(a.transactions);
+  const rows = buildRows(transactions);
 
   return (
     <div className="space-y-5">
@@ -172,10 +252,32 @@ export default async function Page({ params, searchParams }) {
         ))}
       </div>
 
-      {a.pausedMonths?.length > 0 && (
-        <div className="rounded border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm">
-          <strong>Paused months: </strong>
-          {a.pausedMonths.map((p) => monthLabel(p.month, p.year)).join(", ")}
+      {pausedList.length > 0 && (
+        <div className="rounded-md border border-yellow-300 bg-yellow-50 p-3">
+          <p className="mb-2 text-sm font-semibold text-yellow-900">
+            Paused Months ({pausedList.length})
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {pausedList.map((p) => {
+              const setOn = getPauseSetDate(transactions, p.month, p.year);
+              return (
+                <span
+                  key={`${p.year}-${p.month}`}
+                  className="rounded border border-yellow-400 bg-white px-2 py-1 text-xs text-yellow-900"
+                >
+                  <strong>{monthLabel(p.month, p.year)}</strong>
+                  {setOn && (
+                    <span className="ml-1 text-gray-500">
+                      (paused on {fmtDate(setOn)})
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-yellow-800">
+            Ei month gulote salary theke advance kata hobe na.
+          </p>
         </div>
       )}
 

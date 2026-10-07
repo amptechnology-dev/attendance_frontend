@@ -231,7 +231,7 @@ export default function AdvanceList({
       </Card>
 
       <div className="p-3">
-        {/* <div className="flex flex-wrap gap-2 items-center py-3">
+        <div className="flex flex-wrap gap-2 items-center py-3">
           <h3 className="text-lg">Advances</h3>
           {data.length > 0 && (
             <div className="flex gap-2">
@@ -255,7 +255,7 @@ export default function AdvanceList({
               </Button>
             </div>
           )}
-        </div> */}
+        </div>
 
         {!data.length ? (
           <p className="text-sm text-gray-500">{loading ? "Loading..." : "No advance records found."}</p>
