@@ -6,6 +6,7 @@ import { Turnstile } from "@marsidev/react-turnstile";
 import Image from "next/image";
 import { FaEye, FaEyeSlash, FaLock, FaUser } from "react-icons/fa";
 import { HiShieldCheck } from "react-icons/hi";
+import ForgotPassword from "../components/ForgotPassword";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -17,8 +18,9 @@ export default function Login() {
   const router = useRouter();
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState("password");
+  const [showForgot, setShowForgot] = useState(false);
 
-   const [usernameReadOnly, setUsernameReadOnly] = useState(true);
+  const [usernameReadOnly, setUsernameReadOnly] = useState(true);
   const [passwordReadOnly, setPasswordReadOnly] = useState(true);
 
   const handleSubmit = async (e) => {
@@ -47,7 +49,7 @@ export default function Login() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, password }),
             credentials: "include",
-          }
+          },
         );
 
         const data = await res.json();
@@ -80,7 +82,7 @@ export default function Login() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, otp }),
             credentials: "include",
-          }
+          },
         );
 
         const data = await res.json();
@@ -97,6 +99,22 @@ export default function Login() {
       }
     }
   };
+
+  // Forgot password reset hole backend already accessToken cookie set kore diyeche
+  const handleResetLogin = () => {
+    router.replace("/dashboard");
+    router.refresh(); // notun cookie diye server component gulo refetch hobe
+  };
+
+  if (showForgot) {
+    return (
+      <ForgotPassword
+        type="admin"
+        onBack={() => setShowForgot(false)}
+        onSuccess={handleResetLogin}
+      />
+    );
+  }
 
   return (
     <div
@@ -151,14 +169,22 @@ export default function Login() {
         )}
 
         {/* autoComplete="off" form-level + fake hidden fields Chrome-কে confuse করার জন্য */}
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4"
-          autoComplete="off"
-        >
+        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
           {/* Chrome/Safari autofill কে confuse করার জন্য hidden dummy fields */}
-          <input type="text" name="fake-username" className="hidden" tabIndex={-1} autoComplete="off" />
-          <input type="password" name="fake-password" className="hidden" tabIndex={-1} autoComplete="off" />
+          <input
+            type="text"
+            name="fake-username"
+            className="hidden"
+            tabIndex={-1}
+            autoComplete="off"
+          />
+          <input
+            type="password"
+            name="fake-password"
+            className="hidden"
+            tabIndex={-1}
+            autoComplete="off"
+          />
 
           {step === "password" && (
             <>
@@ -221,7 +247,11 @@ export default function Login() {
                     tabIndex={-1}
                     className="absolute inset-y-0 right-3.5 flex items-center text-gray-400 hover:text-gray-600 transition"
                   >
-                    {showPassword ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+                    {showPassword ? (
+                      <FaEyeSlash size={16} />
+                    ) : (
+                      <FaEye size={16} />
+                    )}
                   </button>
                 </div>
               </div>
@@ -322,6 +352,15 @@ export default function Login() {
               "Verify OTP"
             )}
           </button>
+          {step === "password" && (
+            <button
+              type="button"
+              onClick={() => setShowForgot(true)}
+              className="w-full text-sm text-blue-300 hover:text-blue-200 underline"
+            >
+              Forgot password?
+            </button>
+          )}
         </form>
 
         {/* Footer Help Section */}

@@ -6,6 +6,7 @@ import { Turnstile } from "@marsidev/react-turnstile";
 import Image from "next/image";
 import { FaEye, FaEyeSlash, FaLock, FaUser } from "react-icons/fa";
 import { HiShieldCheck } from "react-icons/hi";
+import ForgotPassword from "../components/ForgotPassword";
 
 export default function SuperAdminLogin() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function SuperAdminLogin() {
   const [turnstileStatus, setTurnstileStatus] = useState("required");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showForgot, setShowForgot] = useState(false);
 
   const login = async (payload) => {
     const res = await fetch(
@@ -26,7 +28,7 @@ export default function SuperAdminLogin() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
         credentials: "include",
-      }
+      },
     );
     const data = await res.json();
     return { ok: res.ok && data.success, data };
@@ -53,7 +55,10 @@ export default function SuperAdminLogin() {
     setIsLoading(true);
     try {
       if (step === "password") {
-        const { ok, data } = await login({ username: username.trim(), password });
+        const { ok, data } = await login({
+          username: username.trim(),
+          password,
+        });
         if (ok) {
           setStep("otp");
         } else {
@@ -80,6 +85,22 @@ export default function SuperAdminLogin() {
     setError(null);
   };
 
+  // Forgot password reset hole backend already accessToken cookie set kore diyeche
+  const handleResetLogin = () => {
+    router.replace("/auth/super-admin/manage-admins");
+    router.refresh(); // notun cookie diye server component gulo refetch hobe
+  };
+
+  if (showForgot) {
+    return (
+      <ForgotPassword
+        type="superadmin"
+        onBack={() => setShowForgot(false)}
+        onSuccess={handleResetLogin}
+      />
+    );
+  }
+
   return (
     <div
       className="flex justify-center items-center min-h-screen bg-no-repeat bg-center bg-cover px-4 py-8"
@@ -105,7 +126,9 @@ export default function SuperAdminLogin() {
         <div className="text-center mb-7">
           <h2 className="text-2xl font-bold text-white">Super Admin</h2>
           <p className="text-sm text-gray-300 mt-1">
-            {step === "password" ? "Sign in to manage admins" : "Verify your identity"}
+            {step === "password"
+              ? "Sign in to manage admins"
+              : "Verify your identity"}
           </p>
         </div>
 
@@ -167,7 +190,11 @@ export default function SuperAdminLogin() {
                     tabIndex={-1}
                     className="absolute inset-y-0 right-3.5 flex items-center text-gray-400 hover:text-gray-600 transition"
                   >
-                    {showPassword ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+                    {showPassword ? (
+                      <FaEyeSlash size={16} />
+                    ) : (
+                      <FaEye size={16} />
+                    )}
                   </button>
                 </div>
               </div>
@@ -249,9 +276,18 @@ export default function SuperAdminLogin() {
                 ? "Signing in..."
                 : "Verifying..."
               : step === "password"
-              ? "Sign In"
-              : "Verify OTP"}
+                ? "Sign In"
+                : "Verify OTP"}
           </button>
+          {step === "password" && (
+            <button
+              type="button"
+              onClick={() => setShowForgot(true)}
+              className="w-full text-sm text-blue-300 hover:text-blue-200 underline"
+            >
+              Forgot password?
+            </button>
+          )}
         </form>
       </div>
     </div>
